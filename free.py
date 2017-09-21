@@ -4,7 +4,7 @@ from math import sin, pi
 
 # x'' = -x
 
-h = 0.01
+h = 0.2
 n = 10000
 
 x = [1.0]
