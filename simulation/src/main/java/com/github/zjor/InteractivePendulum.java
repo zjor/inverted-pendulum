@@ -5,7 +5,7 @@ import lombok.Setter;
 import processing.core.PApplet;
 import processing.event.MouseEvent;
 
-public class App extends PApplet {
+public class InteractivePendulum extends PApplet {
 
     public static final int WIDTH = 800;
     public static final int HEIGHT = 600;
@@ -13,7 +13,7 @@ public class App extends PApplet {
     static final int CART_WIDTH = 50;
     static final int CART_HEIGHT = 30;
 
-    static final long TIME_THRESHOLD = 10;
+    static final long TIME_THRESHOLD = 2;
 
     public static final double h = 0.1;
     public static final double l = 150;
@@ -55,6 +55,7 @@ public class App extends PApplet {
             double dz1 = cart.getV() + dZ(th1) * h;
             cart.setX(cart.getX() + (cart.getV() + dz1) * h / 2);
             cart.setV(cart.getV() + (dZ(th) + dZ(th1)) * h / 2);
+            cart.setA(dZ(th));
         }
 
         fill(255);
@@ -117,11 +118,11 @@ public class App extends PApplet {
     }
 
     private double dZ(double th) {
-        return - 0.2 * gravity * Math.sin(2.0 * th) / 2;
+        return -0.2 * gravity * Math.sin(2.0 * th) / 2;
     }
 
     public static void main(String[] args) {
-        PApplet.main(App.class.getName());
+        PApplet.main(InteractivePendulum.class.getName());
     }
 
     class Cart {
