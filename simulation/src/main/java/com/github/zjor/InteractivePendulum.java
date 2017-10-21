@@ -47,7 +47,6 @@ public class InteractivePendulum extends PApplet {
         double th1 = th + dth * h;
         double dth1 = dth + dTh(th) * h;
 
-
         th = th + (dth + dth1) * h / 2;
         dth = dth + (dTh(th) + dTh(th1)) * h / 2;
 
