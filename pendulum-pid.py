@@ -15,9 +15,10 @@ dth = [0.0]
 f = [0.0]
 v = [0.0]
 x = [0.0]
+x0 = 0.0
 
 dt = 0.005
-N = 2000
+N = 10000
 
 Kp = 45.0
 Kd = 18.0
@@ -27,7 +28,7 @@ xKd = 3.0
 
 for i in range(0, N):
 
-	f.append((Kp * th[i] + Kd * dth[i] + xKp * x[i] + xKd * v[i]))	
+	f.append((Kp * th[i] + Kd * dth[i] + xKp * (x[i] - x0) + xKd * v[i]))	
 
 	d2th = (g * sin(th[i]) - f[i] * cos(th[i])) / L
 	dth1 = dth[i] + d2th * dt
@@ -37,6 +38,9 @@ for i in range(0, N):
 	
 	th.append(th[i] + dth1 * dt)
 	dth.append(dth1)
+
+	if i == 5000:
+		x0 = 5.0
 
 plt.figure(1)
 plt.subplot(211)
