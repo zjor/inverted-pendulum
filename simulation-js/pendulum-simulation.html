@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0-beta/css/materialize.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0-beta/js/materialize.min.js"></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+	<link rel="stylesheet" type="text/css" href="css/styles.css">
+</head>
+<body>
+	<div class="content">
+		<h4>Inverted pendulum simulation</h4>
+		<h6>Free cart</h6>
+		<div class="container">
+			<div class="canvas-container">
+				<canvas id="canvas" width="400" height="400">
+				</canvas>			
+			</div>
+			<div class="toolbar">
+				<a class="waves-effect waves-light btn blue" id="start">Start</a>
+				<a class="waves-effect waves-light btn blue" id="stop">Stop</a>
+			</div>
+		</div>
+		<h6>Equations of motion</h6>
+		<div>
+$$ 
+\left\{ 
+\begin{array}{ll}  
+
+L\ddot\Theta = g sin\Theta + \ddot xcos\Theta \\  
+(m+M)\ddot x + m\ddot \Theta L cos\Theta - mL\dot \Theta^2sin\Theta = 0
+
+\end{array}
+\right.
+$$
+		</div>
+		<h6>Numerical equations, Heun's method</h6>
+		<div>
+$$ 
+\left\{ 
+\begin{array}{ll}  
+
+\tilde \Theta _{i+1} = \Theta _{i+1} + hZ_i \\
+\tilde Z _{i+1} = Z_i + h\frac{g}{l}sin\Theta_i \\
+\Theta _{i+1} = \Theta _{i+1} + \frac{h}{2}(Z_i + \tilde Z _{i+1}) \\
+Z _{i+1} = Z_i + \frac{h}{2}\frac{g}{l}(sin\Theta_i + sin\tilde \Theta _{i+1}) \\
+
+\end{array}
+\right.
+$$
+
+	</div>
+	<div>
+$$ 
+\left\{ 
+\begin{array}{ll}  
+
+\tilde x_{i+1} = x_i + hY_i \\
+\tilde Y_{i+1} = Y_i - h\beta sin\Theta_i(gcos\Theta_i - LZ^2_i) \\
+x_{i+1} = x_i + \frac{h}{2}(Y_i + \tilde Y_{i+1}) \\
+Y_{i+1} = Y_i - \frac{h}{2}\beta(sin\Theta_i(gcos\Theta_i - LZ^2_i) + sin\tilde \Theta_i(gcos\tilde \Theta_i - L\tilde Z^2_i))
+
+\end{array}
+\right.
+$$
+Where \(\beta = \frac{m}{m+M}\)
+		</div>
+
+	</div>
+
+	<!-- <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>	 -->
+	<script src="js/jquery-3.2.1.min.js"></script>	
+	<script src="js/inverted-pendulum.js"></script>
+</body>
+</html>

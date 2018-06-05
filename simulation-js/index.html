@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0-beta/css/materialize.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0-beta/js/materialize.min.js"></script>
+
+	<link rel="stylesheet" type="text/css" href="css/styles.css">
+</head>
+<body>
+	<div class="content">
+
+		<div class="collection">
+			<a href="pendulum-simulation.html" class="collection-item">Free cart</a>
+			<a href="pendulum-stabilization.html" class="collection-item">Stabilization</a>
+			<a href="external-disturbance.html" class="collection-item">External disturbance</a>
+		</div>
+
+		<h4>Solving differential equations numerically</h4>
+		<h5>Heun's method</h5>
+		<div class="container">
+			<div class="canvas-container">
+				<canvas id="e-canvas" width="400" height="400">
+				</canvas>			
+			</div>
+			<div class="toolbar">
+				<button id="e-start">Start</button>
+				<button id="e-stop">Stop</button>
+			</div>
+		</div>
+	</div>
+
+
+
+	<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>	
+	<!-- <script src="inverted-pendulum.js"></script> -->
+	<script src="js/de.js"></script>
+</body>
+</html>

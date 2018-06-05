@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0-beta/css/materialize.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0-beta/js/materialize.min.js"></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+	<link rel="stylesheet" type="text/css" href="css/styles.css">
+</head>
+<body>
+	<div class="content">
+		<h4>Inverted pendulum stabilization</h4>
+		<div class="container">
+			<div class="canvas-container">
+				<canvas id="canvas" width="400" height="400">
+				</canvas>			
+			</div>
+			<div class="toolbar">
+				<a class="waves-effect waves-light btn blue" id="start">Start</a>
+				<a class="waves-effect waves-light btn blue" id="stop">Stop</a>
+			</div>
+			<div class="toolbar">
+				<a class="waves-effect waves-light btn blue" id="left">Left</a>
+				<a class="waves-effect waves-light btn blue" id="right">Right</a>
+			</div>			
+		</div>
+	</div>
+	<!-- <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>	 -->
+	<script src="js/jquery-3.2.1.min.js"></script>	
+	<script src="js/ip-disturbance.js"></script>
+</body>
+</html>

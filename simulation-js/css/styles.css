@@ -1,0 +1,47 @@
+html, body, div {
+	margin: 0;
+	padding: 0;
+}
+
+canvas {
+	width: 400;
+	height: 400;
+}
+
+.content {
+	width: 770px;
+	margin: 0 auto;
+}
+
+.container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+
+}
+
+.canvas-container {
+	display: flex;
+	justify-content: center;
+
+	width: 402px;
+	border: 1px solid black;
+}
+
+.toolbar {
+	display: flex;
+	flex-direction: row;
+	justify-content: center;
+	width: 402px;
+
+}
+
+.btn {
+	margin: 8px;
+}
+
+button {
+	min-width: 192px;
+	height: 48px;
+	margin: 8px;
+}
