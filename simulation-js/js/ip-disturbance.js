@@ -7,6 +7,7 @@ const boxWidth = 40
 const boxHeight = 20
 const boxY = heigth / 2
 
+const m = 1.0
 const l = 10
 const g = 9.8
 let x0 = 0.0
@@ -24,6 +25,9 @@ let y = 0.0
 let time = 0.0
 
 let lastControl = 0.0
+let isFree = true
+
+const round = (n) => Math.round(n * 100.0) / 100.0
 
 function draw(ctx) {
 	ctx.clearRect(0, 0, width, heigth)
@@ -47,10 +51,11 @@ function draw(ctx) {
 	ctx.arc(rodX, rodY, 10, 0, 2.0 * Math.PI)
 	ctx.stroke()
 
-	const thetaVisual = Math.round(((theta * 180.0 / Math.PI) % 360) * 100) / 100
+	const thetaVisual = round((theta * 180.0 / Math.PI) % 360)
 	ctx.strokeText("Theta: " + thetaVisual, 5, 15)
-	ctx.strokeText("F: " + Math.round(lastControl * 100) / 100, 5, 25)
+	ctx.strokeText("F: " + round(lastControl), 5, 25)
 	ctx.strokeText("Controllable: " + isControllable(theta), 5, 35)
+	ctx.strokeText("Energy: " + round(energy().total), 5, 45)
 
 	if (time == 0.0) {
 		time = performance.now()
@@ -68,7 +73,18 @@ const xKp = 2.0
 const xKd = 3.5
 
 const w = Math.sqrt(g / l)
-const A = 1.0
+const A = 3.0
+
+function energy() {
+	const p = l * (1 + cos(theta)) * m * g
+	const k = m * (z * l) ** 2 / 2
+	return {potential: p, kinetic: k, total: p + k}
+}
+
+function normTheta(th) {
+	let nTh = th % (Math.PI * 2.0)
+	return (nTh > Math.PI) ? nTh - 2 * Math.PI : nTh
+}
 
 function isControllable(th) {
 	let nTh = th % (Math.PI * 2.0)
@@ -76,9 +92,10 @@ function isControllable(th) {
 	return nTh < thetaThreshold
 }
 
-function control(th, dth, x, dx) {
-	if (isControllable(th)) {
-		return Kp * th + Kd * dth + xKp * (x - x0) + xKd * dx
+function control(th, dth, x, dx) {	
+	isFree = isFree && !isControllable(th)
+	if (!isFree) {
+		return Kp * normTheta(th) + Kd * dth + xKp * (x - x0) + xKd * dx
 	} else {
 		return A * cos(w * time / 1000)
 	}
@@ -86,20 +103,27 @@ function control(th, dth, x, dx) {
 
 function integrate(h) {
 	const ddx = control(theta, z, x, y)
+	console.log(ddx, normTheta(theta), z, (x - x0), y, "E: ", energy().total)
 	lastControl = ddx
 
+	// const th1 = theta + h * z
+	// const z1 = z + h * (g * sin(theta) - ddx * cos(theta)) / l
+	// const th2 = theta + h / 2 * (z + z1)
+	// const z2 = z + h / 2 * g / l * (sin(theta) + sin(th1) - ddx * (cos(theta) + cos(th1)))
+
+	const ddth = (g * sin(theta) - ddx * cos(theta)) / l
+
 	const th1 = theta + h * z
-	const z1 = z + h * (g * sin(theta) - ddx * cos(theta)) / l
-	const th2 = theta + h / 2 * (z + z1)
-	const z2 = z + h / 2 * g / l * (sin(theta) + sin(th1) - ddx * (cos(theta) + cos(th1)))
+	const z1 = z + h * ddth
+
 	
 	const x1 = x + h * y
 	const y1 = y + h * ddx
 
-	theta = th2
-	z = z2
+	theta = th1
+	z = z1
 
-	if (isControllable(theta))	{
+	if (!isFree) {
 		y = y1
 		x = x1
 	} else {
