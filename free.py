@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-from math import sin, pi
+from math import sin, cos, pi, sqrt
 
 '''
 	x'' = -x
@@ -10,38 +10,36 @@ from math import sin, pi
 
 '''
 
-h = 0.1
-n = 10000
+h = 0.001
+n = 30000
 
-x = [1.0]
+t = [0]
+x = [0.0]
 y = [0.0]
 
+def force(t, x, y):
+	return 0.5 * sin(0.5*sqrt(t**3))
+
 for i in range(n):
-
+	
 	x1 = x[i] + h * y[i]
-	y1 = y[i] - h * x[i]
+	y1 = y[i] + h * force(t[-1], x[i], y[i])
 
-	new_x = x[i] + h * (y[i] + y1) / 2
-	new_y = y[i] - h * (x[i] + x1) / 2
+	x2 = x[i] + h * (y[i] + y1) / 2
+	y2 = y[i] + h * (force(t[-1], x[i], y[i]) + force(t[-1], x1, y1)) / 2
 
-	# k1 = y[i]
-	# k2 = y[i] + k1 / 2
-	# k3 = y[i] + k2 / 2
-	# k4 = y[i] + k3
-	# new_x = x[i] + h * h * (k1 + 2 * k2 + 2 * k3 + k4) / 6
+	y.append(y2)
+	x.append(x2)
+	t.append(t[-1] + h)
 
-	# k1 = -x[i]
-	# k2 = -x[i] - k1 / 2
-	# k3 = -x[i] - k2 / 2
-	# k4 = -x[i] - k3
-	# new_y = y[i] + h * h * (k1 + 2 * k2 + 2 * k3 + k4) / 6
+# plt.figure(1)
 
+# plt.subplot(211)
+line_x, = plt.plot(t, x, label='x')
+# plt.subplot(212)
+line_y, = plt.plot(t, y, label='y')
 
-	y.append(new_y)
-	x.append(new_x)
-
-
-
-plt.plot(x, y)
+plt.legend([line_x, line_y])
+plt.grid()
 plt.show()
 

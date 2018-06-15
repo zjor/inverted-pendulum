@@ -1,5 +1,14 @@
-const sin = Math.sin
-const cos = Math.cos
+const { sin, cos, sqrt, abs, PI } = Math
+const agm = (x, y) => {
+	let [a, g] = [x, y]
+	while (Math.abs(a - g) > 0.001) {
+		[a, g] = [0.5 * (a + g), Math.sqrt(a * g)]
+	}
+	return a
+}
+const getW = (angle, l, g) => {
+	return agm(1.0, Math.cos(angle / 2)) * Math.sqrt(g / l)
+}
 
 const width = 400
 const heigth = 300
@@ -12,15 +21,16 @@ const l = 10
 const g = 9.8
 let x0 = 0.0
 
-let x = -10.0
-let theta = Math.PI
+let x = 0.0
+let theta = PI
 
 // z = theta'
 let z = 0.0
 // y = x'
 let y = 0.0
 
-let time = 0.0
+let t = 0.0
+const h = 0.01
 
 const round = (n) => Math.round(n * 100.0) / 100.0
 
@@ -50,13 +60,9 @@ function draw(ctx) {
 	ctx.strokeText("Theta: " + thetaVisual, 5, 15)
 	ctx.strokeText("Energy: " + round(energy().total), 5, 45)
 
-	if (time == 0.0) {
-		time = performance.now()
-	} else {
-		const now = performance.now()
-		integrate((now - time) / 1000)
-		time = now
-	}
+	integrate(h)
+	t += h
+	
 }
 
 const Kp = 100.0
@@ -64,9 +70,6 @@ const Kd = 50.0
 
 const xKp = 2.0
 const xKd = 3.5
-
-const hdth = []
-const hddth = []
 
 function energy() {
 	const p = l * (1 + cos(theta)) * m * g
@@ -79,54 +82,58 @@ function normTheta(th) {
 	return (nTh > Math.PI) ? nTh - 2 * Math.PI : nTh
 }
 
-const last = (list) => list[list.length - 1]
+let w = Math.sqrt(g / l)
+let T = 2.0 * Math.PI / w
+let isSwinging = false
+let swingTime = 0.0
 
-function control(th, dth, x, dx) {
-	
-	if (hdth.length < 2) {
-		return 1.0
-	} else {
-		if (last(hdth) > 0 && last(hddth) > 0) {
-			return 1.0
-		} else if (last(hdth) > 0 && last(hddth) < 0) {
-			return -1.0
-		} else if (last(hdth) < 0 && last(hddth) > 0) {
-			return 1.0
-		} else if (last(hdth) < 0 && last(hddth) < 0) {
-			return -1.0
+console.log("W=", w, "W'=", getW(0.0, l, g))
 
+function control(th, dth, x, dx, t) {
+	if (isSwinging) {
+		if (swingTime > 3 * T / 4 && abs(dx) < 0.05) {
+			isSwinging = false
+			console.log('Swing stopped')
 		}
+		swingTime += h
+		return 4.0* cos(w * swingTime)
+	} else {
+		if (abs(dth) < 0.01 && th >= PI) {
+			isSwinging = true
+			swingTime = 0.0
+			// w = getW(th, l, g)
+			// T = 2.0 * Math.PI / w
+		}		
 		return 0.0
-	}	
+	}
 }
 
 function integrate(h) {
-	const ddx = control(theta, z, x, y)
+	const ddx = control(theta, z, x, y, t)
 
-	console.log(last(hdth), last(hddth), ddx)
-
-	// const th1 = theta + h * z
-	// const z1 = z + h * (g * sin(theta) - ddx * cos(theta)) / l
-	// const th2 = theta + h / 2 * (z + z1)
-	// const z2 = z + h / 2 * g / l * (sin(theta) + sin(th1) - ddx * (cos(theta) + cos(th1)))
-
-	const ddth = (g * sin(theta) - ddx * cos(theta)) / l
+	console.log("h=", h, x, y, ddx, 'dth=', z)
 
 	const th1 = theta + h * z
-	const z1 = z + h * ddth
+	const z1 = z + h * (g * sin(theta) - ddx * cos(theta)) / l
+	const th2 = theta + h / 2 * (z + z1)
+	const z2 = z + h / 2 * (g * (sin(theta) + sin(th1)) - ddx * (cos(theta) + cos(th1))) / l
 
-	
+	// const ddth = (g * sin(theta) - ddx * cos(theta)) / l
+
+	// const th1 = theta + h * z
+	// const z1 = z + h * ddth
+
 	const x1 = x + h * y
 	const y1 = y + h * ddx
 
-	theta = th1
-	z = z1
-	y = y1
-	x = x1
-	
-	hdth.push(z)
-	hddth.push(ddth)
+	const x2 = x + h / 2 * (y + y1)
+	const y2 = y + h / 2 * (ddx + control(theta, z, x, y, t))
 
+
+	theta = th2
+	z = z2
+	y = y2
+	x = x2	
 }
 
 $(() => {
@@ -143,7 +150,7 @@ $(() => {
 
 	$('#start').click(() => {
 		started = true
-		drawCycle(ctx, 50)
+		drawCycle(ctx, 25)
 	})
 
 	$('#stop').click(() => {
