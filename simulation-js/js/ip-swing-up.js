@@ -7,6 +7,7 @@ const agm = (x, y) => {
 	return a
 }
 const getW = (angle, l, g) => {
+	console.log(`angle = ${angle}; L = ${l}; g = ${g}`)
 	return agm(1.0, Math.cos(angle / 2)) * Math.sqrt(g / l)
 }
 
@@ -83,28 +84,34 @@ function normTheta(th) {
 }
 
 let w = Math.sqrt(g / l)
-let T = 2.0 * Math.PI / w
+const T0 = 2.0 * Math.PI / w
+let T = T0
+let A = 4.0
 let isSwinging = false
 let swingTime = 0.0
-
-console.log("W=", w, "W'=", getW(0.0, l, g))
 
 function control(th, dth, x, dx, t) {
 	if (isSwinging) {
 		if (swingTime > 3 * T / 4 && abs(dx) < 0.05) {
 			isSwinging = false
-			console.log('Swing stopped')
+			console.log("Swing stopped")			
 		}
 		swingTime += h
-		return 4.0* cos(w * swingTime)
+		return A * cos(w * swingTime)
 	} else {
 		if (abs(dth) < 0.01 && th >= PI) {
 			isSwinging = true
 			swingTime = 0.0
-			// w = getW(th, l, g)
-			// T = 2.0 * Math.PI / w
-		}		
-		return 0.0
+			w = getW(abs(PI - th), l, g)
+			T = 2.0 * Math.PI / w
+			A = 4.0 * T0 / T
+			console.log("new W =", w, "new T =", T)
+		}
+		if (abs(normTheta(th)) < PI / 6) {
+			return Kp * normTheta(th) + Kd * dth + xKp * (x - x0) + xKd * dx
+		} else {
+			return 0.0
+		}
 	}
 }
 
@@ -150,7 +157,7 @@ $(() => {
 
 	$('#start').click(() => {
 		started = true
-		drawCycle(ctx, 25)
+		drawCycle(ctx, 5)
 	})
 
 	$('#stop').click(() => {
