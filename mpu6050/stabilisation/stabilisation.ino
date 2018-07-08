@@ -246,7 +246,6 @@ int loopState = LOOP_STATE_INIT;
 
 unsigned long delayStartMicros = 0;
 
-unsigned long lastStepDelay = ULONG_MAX;
 unsigned long stepDelay = ULONG_MAX;
 double velocity = 0.0;
 double accel = 0.0;
@@ -256,14 +255,14 @@ int dir = DIR_LEFT;
 const double r = 0.0135;
 const double k = M_PI * r / 100;
 
-const double Kp = 20; //45.0;
+const double Kp = 45.0;
 const double Kd = 18.0;
 
-const double xKp = 2.0;
-const double xKd = 3.0;
+const double xKp = 0.5; // 2.0;
+const double xKd = 0.01; // 3.0;
 
 double getControl(double a, double da, double dx, double v) {
-  return - (Kp * a + Kd * da + xKp * dx * k + xKd * v);
+  return (Kp * a + Kd * da + xKp * dx + xKd * v);
 }
 
 void moveCartLoop() {
@@ -271,73 +270,50 @@ void moveCartLoop() {
   double da;  
   double dx;  
   
-  if (!halted) {
-    switch (loopState) {
-      case LOOP_STATE_INIT:
-        if (angle == ANGLE_NOT_SET) {
-          break;
-        }
-        if (lastAngle == ANGLE_NOT_SET) {
-          lastAngle = angle;
-        }
-        if (millis() - nowMillis < 10) {
-          // too soon
-          break;
-        }
-        dt = 1.0 * (millis() - nowMillis)/1000;
-        da = (angle - lastAngle) / dt;
-        dx = length / 2 - position;
-
-        Serial.print("dt: ");Serial.print(dt, 4);
-        Serial.print("; a: ");Serial.print(angle, 4);
-        Serial.print("; da: ");Serial.print(da, 4);
-        Serial.print("; dx: ");Serial.print(dx, 4); 
-        Serial.print("; v: ");Serial.println(velocity, 4);
-        
-        accel = getControl(angle, da, dx, velocity);
-        velocity += accel * dt;
-        lastAngle = angle;
-        if (abs(velocity) > 0.01) {
-          stepDelay = 100.0 * k / abs(velocity) + 200;
-        }
-        dir = velocity < 0 ? DIR_LEFT : DIR_RIGHT;
-
-        Serial.print("Accel: ");Serial.print(accel);Serial.print("; velocity: ");Serial.print(velocity);Serial.print("; step: ");Serial.println(stepDelay);
-                
-        if (abs(velocity) > 0.01) {
-          digitalWrite(dirPin, dir);        
-          digitalWrite(stepPin, HIGH); 
-          loopState = LOOP_STATE_DELAY1;
-        }
-        delayStartMicros = micros();
-        nowMillis = millis();
-        break;
-      case LOOP_STATE_DELAY1:
-        if (micros() - delayStartMicros >= stepDelay) {
-          loopState = LOOP_STATE_STEP_CONTINUE;          
-        }
-        break;
-      case LOOP_STATE_STEP_CONTINUE:
-        digitalWrite(stepPin, LOW);
-        loopState = LOOP_STATE_DELAY2;
-        delayStartMicros = micros();
-        break;
-      case LOOP_STATE_DELAY2:
-        if (micros() - delayStartMicros >= stepDelay) {
-          loopState = LOOP_STATE_CONTINUE;
-        }
-        break;
-      case LOOP_STATE_CONTINUE:
-        Serial.print("Stepping: ");
-        Serial.println(dir == DIR_LEFT ? stepDelay : -((long)stepDelay));
-        position += (dir == DIR_LEFT) ? -1 : 1;
-        loopState = LOOP_STATE_INIT;
-        break;
-    }
+  if (angle == ANGLE_NOT_SET) {
+    return;
   }
-  if (digitalRead(PIN_SWITCH_A) == LOW || digitalRead(PIN_SWITCH_B) == LOW) {
-    halted = true;
-  }  
+  if (lastAngle == ANGLE_NOT_SET) {
+    lastAngle = angle;
+  }
+  if (millis() - nowMillis < 200) {
+    // too soon
+    return;
+  }
+  dt = 1.0 * (millis() - nowMillis)/1000;
+  da = (angle - lastAngle) / dt;
+  dx = - (position - length / 2) * k;
+  
+  Serial.print("dt: ");Serial.print(dt, 4);
+  Serial.print("; a: ");Serial.print(angle, 4);
+  Serial.print("; da: ");Serial.print(da, 4);
+  Serial.print("; dx: ");Serial.print(dx, 4); 
+  Serial.print("; v: ");Serial.println(velocity, 4);
+  
+  accel = getControl(angle, da, dx, velocity);
+  velocity += accel * dt;
+  lastAngle = angle;
+  if (abs(velocity) > 0.01) {
+    stepDelay = 75.0 * k / abs(velocity) + 350;
+  }
+  dir = velocity < 0 ? DIR_LEFT : DIR_RIGHT;
+  
+  Serial.print("Accel: ");Serial.print(accel);Serial.print("; velocity: ");Serial.print(velocity);Serial.print("; step: ");Serial.println(stepDelay);
+  nowMillis = millis();  
+}
+
+int stepperPhase = HIGH;
+
+void rotateMotorLoop() {
+  if (micros() - delayStartMicros >= stepDelay) {
+    digitalWrite(dirPin, dir);        
+    digitalWrite(stepPin, stepperPhase);
+    if (stepperPhase == LOW) {
+      position += (dir == DIR_LEFT) ? -1 : 1;
+    }
+    stepperPhase = (stepperPhase == HIGH) ? LOW : HIGH;
+    delayStartMicros = micros();
+  }
 }
 
 void loop() {
@@ -346,6 +322,14 @@ void loop() {
     // wait for MPU interrupt or extra packet(s) available
     while (!mpuInterrupt && fifoCount < packetSize) {
       moveCartLoop();
+
+      if (digitalRead(PIN_SWITCH_A) == LOW || digitalRead(PIN_SWITCH_B) == LOW) {
+        halted = true;
+      }  
+            
+      if (!halted) {
+        rotateMotorLoop();
+      }
     }
 
     // reset interrupt flag and get INT_STATUS byte
@@ -378,11 +362,8 @@ void loop() {
             mpu.dmpGetQuaternion(&q, fifoBuffer);
             mpu.dmpGetGravity(&gravity, &q);
             mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-//            Serial.print("ypr\t");
 //            Serial.print(ypr[0] * 180/M_PI);
-//            Serial.print("\t");
 //            Serial.print(ypr[1] * 180/M_PI);
-//            Serial.print("\t");
 //            Serial.println(ypr[2] * 180/M_PI);
             angle = ypr[2];            
         #endif        
