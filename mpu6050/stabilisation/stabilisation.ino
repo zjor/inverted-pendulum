@@ -1,3 +1,4 @@
+#include <math.h>
 #include <limits.h>
 
 #include "I2Cdev.h"
@@ -79,6 +80,8 @@ const int dirPin = 10;
 
 int position = -1;
 int length = -1;
+
+unsigned long nowMillis = 0;
 
 void setupPins() {
   pinMode(stepPin,OUTPUT); 
@@ -176,6 +179,7 @@ void setup() {
 
     Serial.println(F("\nSend any character to continue"));
     waitForAnyCharacter();
+    nowMillis = millis();
 }
 
 int findBoundary(int direction, int speed) {
@@ -226,7 +230,10 @@ int travel(int direction, int steps) {
   return direction == DIR_LEFT ? -steps : steps;
 }
 
-double angle = 0.0;
+#define ANGLE_NOT_SET -1000.0
+
+double angle = ANGLE_NOT_SET;
+double lastAngle = ANGLE_NOT_SET;
 bool halted = false;
 
 #define LOOP_STATE_INIT           1
@@ -238,19 +245,72 @@ bool halted = false;
 int loopState = LOOP_STATE_INIT;
 
 unsigned long delayStartMicros = 0;
+
+unsigned long lastStepDelay = ULONG_MAX;
 unsigned long stepDelay = ULONG_MAX;
+double velocity = 0.0;
+double accel = 0.0;
+
 int dir = DIR_LEFT;
 
+const double r = 0.0135;
+const double k = M_PI * r / 100;
+
+const double Kp = 20; //45.0;
+const double Kd = 18.0;
+
+const double xKp = 2.0;
+const double xKd = 3.0;
+
+double getControl(double a, double da, double dx, double v) {
+  return - (Kp * a + Kd * da + xKp * dx * k + xKd * v);
+}
+
 void moveCartLoop() {
+  double dt;  
+  double da;  
+  double dx;  
+  
   if (!halted) {
     switch (loopState) {
       case LOOP_STATE_INIT:
-        stepDelay = MAX_SPEED_DELAY + 10000 / (angle * angle + 0.1);
-        dir = angle < 0 ? DIR_LEFT : DIR_RIGHT;   
-        digitalWrite(dirPin, dir);        
-        digitalWrite(stepPin, HIGH); 
-        loopState = LOOP_STATE_DELAY1;
+        if (angle == ANGLE_NOT_SET) {
+          break;
+        }
+        if (lastAngle == ANGLE_NOT_SET) {
+          lastAngle = angle;
+        }
+        if (millis() - nowMillis < 10) {
+          // too soon
+          break;
+        }
+        dt = 1.0 * (millis() - nowMillis)/1000;
+        da = (angle - lastAngle) / dt;
+        dx = length / 2 - position;
+
+        Serial.print("dt: ");Serial.print(dt, 4);
+        Serial.print("; a: ");Serial.print(angle, 4);
+        Serial.print("; da: ");Serial.print(da, 4);
+        Serial.print("; dx: ");Serial.print(dx, 4); 
+        Serial.print("; v: ");Serial.println(velocity, 4);
+        
+        accel = getControl(angle, da, dx, velocity);
+        velocity += accel * dt;
+        lastAngle = angle;
+        if (abs(velocity) > 0.01) {
+          stepDelay = 100.0 * k / abs(velocity) + 200;
+        }
+        dir = velocity < 0 ? DIR_LEFT : DIR_RIGHT;
+
+        Serial.print("Accel: ");Serial.print(accel);Serial.print("; velocity: ");Serial.print(velocity);Serial.print("; step: ");Serial.println(stepDelay);
+                
+        if (abs(velocity) > 0.01) {
+          digitalWrite(dirPin, dir);        
+          digitalWrite(stepPin, HIGH); 
+          loopState = LOOP_STATE_DELAY1;
+        }
         delayStartMicros = micros();
+        nowMillis = millis();
         break;
       case LOOP_STATE_DELAY1:
         if (micros() - delayStartMicros >= stepDelay) {
@@ -270,6 +330,7 @@ void moveCartLoop() {
       case LOOP_STATE_CONTINUE:
         Serial.print("Stepping: ");
         Serial.println(dir == DIR_LEFT ? stepDelay : -((long)stepDelay));
+        position += (dir == DIR_LEFT) ? -1 : 1;
         loopState = LOOP_STATE_INIT;
         break;
     }
@@ -323,7 +384,7 @@ void loop() {
 //            Serial.print(ypr[1] * 180/M_PI);
 //            Serial.print("\t");
 //            Serial.println(ypr[2] * 180/M_PI);
-            angle = ypr[2] * 180/M_PI;
+            angle = ypr[2];            
         #endif        
     }
 }
