@@ -20,11 +20,11 @@ x0 = 0.0
 dt = 0.005
 N = 10000
 
-Kp = 45.0
-Kd = 18.0
+Kp = 30.0
+Kd = 10.0
 
-xKp = 2.0
-xKd = 3.0
+xKp = 1.0
+xKd = 2.0
 
 for i in range(0, N):
 
