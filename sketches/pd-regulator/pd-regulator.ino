@@ -21,11 +21,13 @@
 #define ANGLE_ZERO  3.650
 #define V0  0.0
 #define P0  0
-#define Kp  10.0
-#define Kd  8.0
+// -26.22131018  -7.50023911  -0.4472136   -1.30242157
 
-#define aKp  100000.0
-#define aKd  10000.0
+#define Kp  0.447
+#define Kd  1.302
+
+#define aKp  260.221
+#define aKd  70.5
 
 #define ANGLE_SMOOTHING_WINDOW  9
 
@@ -40,9 +42,9 @@ CircularBuffer<float, ANGLE_SMOOTHING_WINDOW> omegas;
 
 Adafruit_ADS1115 angleSensor(0x48);
 
-double a = 0.0; // steps per second^2
-double v = V0; //steps per second
-double f = 1000000.0; //micros per second
+float a = 0.0; // steps per second^2
+float v = V0; //steps per second
+float f = 1000000.0; //micros per second
 
 float angle = FLT_MIN;
 float lastAngle = FLT_MIN;
@@ -66,7 +68,7 @@ void setup() {
   
   setSpeed(v);
 
-  Serial.begin(115200);
+//  Serial.begin(115200);
 }
 
 unsigned long i = 0;
@@ -95,20 +97,19 @@ void loop() {
     }
     
     lastStepTime = now;
-    updateSpeedAndStepDelay(now);
 
-    if (i%10 == 0) {
-      Serial.print(angle);
-      Serial.print("\t\t");
-      Serial.print(omega, 4);
-      Serial.print("\t\t");
-      Serial.print(position);
-      Serial.print("\t\t");
-      Serial.print(v);
-      Serial.print("\t\t");
-      Serial.println(a);  
-    }
-    i++;     
+//    if (i%10 == 0) {
+//      Serial.print(angle, 4);
+//      Serial.print("\t\t");
+//      Serial.print(omega, 4);
+//      Serial.print("\t\t");
+//      Serial.print((float(position) / 10000.0), 4);
+//      Serial.print("\t\t");
+//      Serial.print(10000.0 * v, 4);
+//      Serial.print("\t\t");
+//      Serial.println(a, 4);  
+//    }
+//    i++;     
   }
 
 }
@@ -124,7 +125,8 @@ float readAngle() {
   }
 }
 
-void calculateAcceleration(float theta, float omega, float x, float v) {  
+void calculateAcceleration(float theta, float omega, int position, float v) {
+  float x = float(position) / 10000.0;
   a = - (Kp * x + Kd * v + theta * aKp + omega * aKd);
 }
 
@@ -132,11 +134,11 @@ void updateSpeedAndStepDelay(unsigned long now) {
   if (now - lastSpeedUpdate >= speedUpdateInterval) {
     v += a * (now - lastSpeedUpdate) / f;
     lastSpeedUpdate = now;
-    setSpeed(v);
+    setSpeed(1000.0 * v);
   }  
 }
 
-void setSpeed(int speed) {
+void setSpeed(float speed) {  
   direction = (speed > 0.0) ? HIGH : LOW;  
   stepDelay = (speed == 0) ? 0 : (f / fabs(speed) - PULSE_WIDTH);
 }
@@ -155,7 +157,7 @@ void step() {
 
 float smooth9(CircularBuffer<float, ANGLE_SMOOTHING_WINDOW> &buf) {  
   float avg = .0;
-  for (int i = 0; i < ANGLE_SMOOTHING_WINDOW; i++) {
+  for (long i = 0; i < ANGLE_SMOOTHING_WINDOW; i++) {
     avg += g9[i] * buf[i];
   }  
   return avg;

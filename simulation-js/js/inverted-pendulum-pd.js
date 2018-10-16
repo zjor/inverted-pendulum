@@ -54,12 +54,6 @@ function draw(ctx) {
 	}
 }
 
-// const Kp = 100.0
-// const Kd = 50.0
-
-// const xKp = 2.0
-// const xKd = 3.5
-// 49.29502815 -49.77007276  -0.4472136   -1.94937149
 const Kp = 49.29
 const Kd = 49.77
 

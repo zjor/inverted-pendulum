@@ -12,7 +12,7 @@ from lqr_solver import lqr, dlqr
 """
 
 g = 9.81
-L = 10.0
+L = 0.8
 
 A = np.matrix([
     [.0,    1.,     .0,     .0],
