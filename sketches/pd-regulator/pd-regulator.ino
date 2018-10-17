@@ -1,146 +1,141 @@
 /**
  * This sketch demonstrates how to bring a cart to [x: 0; v: 0] from non-zero position using PD-regulator
- * 
- * Dependencies:
- * - CircularBuffer
  */
-#include <float.h>
 #include <Wire.h>
 #include <Adafruit_ADS1015.h>
 #include <CircularBuffer.h>
  
 #define STEP_PIN    9
 #define DIR_PIN     10
-#define PULSE_WIDTH 5
+#define PULSE_WIDTH 4
 
 #define POSITION_LIMIT  1500
 
 #define ADS0_MIN  242
 #define ADS0_MAX  24141
+#define ANGLE_ZERO  3.24
 
-#define ANGLE_ZERO  3.650
-#define V0  0.0
-#define P0  0
 // -26.22131018  -7.50023911  -0.4472136   -1.30242157
 
 #define Kp  0.447
 #define Kd  1.302
 
-#define aKp  260.221
-#define aKd  70.5
+#define aKp  26.221
+#define aKd  7.5
 
-#define ANGLE_SMOOTHING_WINDOW  9
-
-//const float g7[] = { 0.03559661344, 0.1103628062, 0.2176061504, 0.27286886, 0.2176061504, 0.1103628062, 0.03559661344 };
 const float g9[] = {0.02376257744, 0.06195534498, 0.1228439993, 0.185233293, 0.2124095706, 0.185233293, 0.1228439993, 0.06195534498, 0.02376257744 };
+const float cutoff = 0.5;
 
-// angle values
-CircularBuffer<float, ANGLE_SMOOTHING_WINDOW> thetas;
+CircularBuffer<float, 9> angles;
+Adafruit_ADS1115 ads0(0x48);  //angle sensor ADC
 
-// angular velocity values
-CircularBuffer<float, ANGLE_SMOOTHING_WINDOW> omegas;
-
-Adafruit_ADS1115 angleSensor(0x48);
-
-float a = 0.0; // steps per second^2
-float v = V0; //steps per second
+float a = .0; // meters per second^2
+float v = .0; //meters per second
 float f = 1000000.0; //micros per second
 
-float angle = FLT_MIN;
-float lastAngle = FLT_MIN;
-float omega = FLT_MIN;
-unsigned long lastAngleUpdate = 0;
-unsigned long angleUpdateInterval = f / 100;
-
-unsigned long lastSpeedUpdate = 0;
-unsigned long speedUpdateInterval = f / 100;
-
 int direction = HIGH;
-int position = P0;
+long position = 0;
 
 unsigned long stepDelay = 0;
 unsigned long lastStepTime = 0;
 
+unsigned long lastEvolutionTime = 0;
+unsigned long evolutionPeriod = f / 100;
+
+unsigned long lastAngleUpdateTime = 0;
+unsigned long angleUpdatePeriod = f / 200;
+float lastAngle;
+float filteredAngle;
+float lastFilteredAngle;
+float omega;
+
 void setup() {  
   pinMode(STEP_PIN, OUTPUT); 
   pinMode(DIR_PIN, OUTPUT);
-  angleSensor.begin();
-  
-  setSpeed(v);
-
+  ads0.begin();
 //  Serial.begin(115200);
 }
 
-unsigned long i = 0;
+long i = 0;
 
-void loop() {  
+void loop() {
+  updateAngleAndDerivative();
+  evolveWorld();
+  runMotor();
+
+//  if (i % 10 == 0) {
+//    Serial.print(filteredAngle, 6);
+//    Serial.print("\t");
+//    Serial.print(omega, 6);
+//    Serial.print("\t");
+//    Serial.print(position);
+//    Serial.print("\t");
+//    Serial.println(v, 6);   
+//  }
+//  i++;
+  
+}
+
+float getControl(float th, float omega, float x, float v) {
+  return - (Kp * x + Kd * v + aKp * th + aKd * omega);
+}
+
+void evolveWorld() {
   unsigned long now = micros();
-  if (now - lastAngleUpdate >= angleUpdateInterval) {
-    angle = readAngle();
-    if (angle != FLT_MIN && lastAngle != FLT_MIN) {
-      float tomega = (angle - lastAngle) * f / (now - lastAngleUpdate);
-      omegas.push(tomega);
-      if (omegas.isFull()) {
-        omega = smooth9(omegas);
-        calculateAcceleration(angle, omega, position, v);
-        updateSpeedAndStepDelay(now);
-      }
-    }
+  if (now - lastEvolutionTime >= evolutionPeriod) {
+    float a = getControl(filteredAngle, omega, float(position) / 10000.0, v);
+    
+    float dt = float(now - lastEvolutionTime) / f;
+    v += a * dt;
+    stepDelay = getStepDelay(v);
+    lastEvolutionTime = now;
+  }
+}
+
+//state variables: filteredAngle, omega
+void updateAngleAndDerivative() {
+  angles.push(normalizeAngle(ads0.readADC_SingleEnded(0)));
+  unsigned long now = micros();
+  if (now - lastAngleUpdateTime >= angleUpdatePeriod) {
+    float angle = smooth9(angles);
+    filteredAngle = lastAngle + cutoff * (angle - lastAngle);
+    omega = (filteredAngle - lastFilteredAngle) * f / (now - lastAngleUpdateTime);
+
     lastAngle = angle;
-    lastAngleUpdate = now;    
+    lastFilteredAngle = filteredAngle;
+    lastAngleUpdateTime = now;
   }
   
-  now = micros();
-  if (now - lastStepTime >= stepDelay) {    
-    if (stepDelay > PULSE_WIDTH) {
-      step();
-    }
-    
-    lastStepTime = now;
-
-//    if (i%10 == 0) {
-//      Serial.print(angle, 4);
-//      Serial.print("\t\t");
-//      Serial.print(omega, 4);
-//      Serial.print("\t\t");
-//      Serial.print((float(position) / 10000.0), 4);
-//      Serial.print("\t\t");
-//      Serial.print(10000.0 * v, 4);
-//      Serial.print("\t\t");
-//      Serial.println(a, 4);  
-//    }
-//    i++;     
-  }
-
 }
 
-float readAngle() {
-  int16_t adc0 = angleSensor.readADC_SingleEnded(0);
-  float angle = mapf(adc0, ADS0_MIN, ADS0_MAX, 0.0, 2.0 * PI) - ANGLE_ZERO;
-  thetas.push(angle);
-  if (thetas.isFull()) {
-    return smooth9(thetas);
-  } else {
-    return FLT_MIN;
-  }
+float normalizeAngle(int16_t value) {  
+  return fmap(value, ADS0_MIN, ADS0_MAX, 0, 2.0 * PI) - ANGLE_ZERO;
 }
 
-void calculateAcceleration(float theta, float omega, int position, float v) {
-  float x = float(position) / 10000.0;
-  a = - (Kp * x + Kd * v + theta * aKp + omega * aKd);
+float fmap(float x, float in_min, float in_max, float out_min, float out_max){
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-void updateSpeedAndStepDelay(unsigned long now) {
-  if (now - lastSpeedUpdate >= speedUpdateInterval) {
-    v += a * (now - lastSpeedUpdate) / f;
-    lastSpeedUpdate = now;
-    setSpeed(1000.0 * v);
+float smooth9(CircularBuffer<float, 9> &buf) {  
+  float avg = .0;
+  for (long i = 0; i < 9; i++) {
+    avg += g9[i] * buf[i];
   }  
+  return avg;
 }
 
-void setSpeed(float speed) {  
-  direction = (speed > 0.0) ? HIGH : LOW;  
-  stepDelay = (speed == 0) ? 0 : (f / fabs(speed) - PULSE_WIDTH);
+unsigned long getStepDelay(float speed) {
+  direction = (speed > 0.0) ? HIGH : LOW;
+  return (speed == 0) ? 0 : (f / fabs(10000.0 * speed) - PULSE_WIDTH);
+}
+
+void runMotor() {
+  unsigned long now = micros();
+  if (now - lastStepTime >= stepDelay) {
+    step();
+    stepDelay = getStepDelay(v);   
+    lastStepTime = now;  
+  }
 }
 
 void step() {
@@ -153,16 +148,4 @@ void step() {
   delayMicroseconds(PULSE_WIDTH); 
   digitalWrite(STEP_PIN, LOW);
   position += (direction == HIGH) ? 1 : -1;
-}
-
-float smooth9(CircularBuffer<float, ANGLE_SMOOTHING_WINDOW> &buf) {  
-  float avg = .0;
-  for (long i = 0; i < ANGLE_SMOOTHING_WINDOW; i++) {
-    avg += g9[i] * buf[i];
-  }  
-  return avg;
-}
-
-float mapf(float x, float in_min, float in_max, float out_min, float out_max) {
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
