@@ -29,20 +29,20 @@ B = np.matrix([
 ])
 
 Q = np.matrix([
-    [10000.,   .0,     .0,     .0],
-    [.0,   5.,     .0,     .0],
-    [.0,   .0,     1.,     .0],
-    [.0,   .0,     .0,     1.]    
+    [1.,   .0,     .0,     .0],
+    [.0,   1.,     .0,     .0],
+    [.0,   .0,     100.,     .0],
+    [.0,   .0,     .0,     10000.]    
 ])
 
-R = np.matrix([20.])
+R = np.matrix([1000.])
 
 K, X, eig = lqr(A, B, Q, R)
 print(K)
 print(X)
 print(eig)
 
-th = [pi / 12]
+th = [pi / 16]
 dth = [0.0]
 f = [0.0]
 v = [0.0]
@@ -69,7 +69,10 @@ for i in range(0, N):
 	dth.append(dth1)
 
 	if i == 5000:
-		x0 = 5.0
+		x0 = 0.1
+
+print("Max X: ", max(x))
+print("Max speed: ", max(v))
 
 plt.figure(1)
 plt.subplot(211)

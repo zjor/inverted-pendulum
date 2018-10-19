@@ -2,6 +2,7 @@
  * This sketch demonstrates how to bring a cart to [x: 0; v: 0] from non-zero position using PD-regulator
  */
 #include <float.h>
+#include <limits.h>
 #include <AnalogScanner.h>
 #include <CircularBuffer.h>
  
@@ -12,15 +13,16 @@
 #define POSITION_LIMIT  1500
 
 
-#define ANGLE_ZERO  493.5
+#define ANGLE_ZERO  493.4
 
 // -26.22131018  -7.50023911  -0.4472136   -1.30242157
 
-#define Kp  0.4
-#define Kd  1.13
+#define aKp  35.0
+#define aKd  4.0
 
-#define aKp  42.0
-#define aKd  7.0
+#define Kp  1.5
+#define Kd  2.4
+
 
 const float g9[] = {0.02376257744, 0.06195534498, 0.1228439993, 0.185233293, 0.2124095706, 0.185233293, 0.1228439993, 0.06195534498, 0.02376257744 };
 const float cutoff = 0.5;
@@ -43,10 +45,10 @@ unsigned long stepDelay = 0;
 unsigned long lastStepTime = 0;
 
 unsigned long lastEvolutionTime = 0;
-unsigned long evolutionPeriod = f / 200;
+unsigned long evolutionPeriod = f / 1000;
 
 unsigned long lastAngleUpdateTime = 0;
-unsigned long angleUpdatePeriod = f / 50;
+unsigned long angleUpdatePeriod = f / 1000;
 float lastAngle = FLT_MIN;
 float filteredAngle = FLT_MIN;
 float lastFilteredAngle = FLT_MIN;
@@ -71,16 +73,14 @@ void loop() {
   evolveWorld();
   runMotor();
 
-//  if (i % 500 == 0) {
+//  if (i % 100 == 0) {
 //    Serial.print(filteredAngle, 6);
 //    Serial.print("\t");
 //    Serial.print(omega, 6);
 //    Serial.print("\t");
-//    Serial.print(position);
+//    Serial.print(float(position) / 10000.0, 6);
 //    Serial.print("\t");
-//    Serial.print(v, 6);
-//    Serial.print("\t");
-//    Serial.println(stepDelay);       
+//    Serial.println(v, 6);
 //  }
 //  i++;
   
@@ -146,7 +146,7 @@ float smooth9(CircularBuffer<float, 9> &buf) {
 
 unsigned long getStepDelay(float speed) {
   direction = (speed > 0.0) ? HIGH : LOW;
-  return (speed == 0) ? 0 : (f / fabs(10000.0 * speed) - PULSE_WIDTH);
+  return (speed == 0) ? ULONG_MAX : (f / fabs(10000.0 * speed) - PULSE_WIDTH);
 }
 
 void runMotor() {
@@ -167,7 +167,7 @@ void step() {
   digitalWrite(STEP_PIN, HIGH); 
   delayMicroseconds(PULSE_WIDTH); 
   digitalWrite(STEP_PIN, LOW);
-  position += (direction == HIGH) ? 1 : -1;
+  position += (direction == HIGH) ? -1 : 1;
 }
 
 void onADC(int index, int pin, int value) {
