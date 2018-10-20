@@ -1,7 +1,7 @@
 #include <AnalogScanner.h>
 #include <CircularBuffer.h>
 
-const float f = 1000.0;
+const float f = 1000000.0;
 const float g9[] = { 0.02376257744, 0.06195534498, 0.1228439993, 0.185233293, 0.2124095706, 0.185233293, 0.1228439993, 0.06195534498, 0.02376257744 };
 
 CircularBuffer<float, 9> values;
@@ -18,7 +18,8 @@ float lastValue;
 float lastFiltered;
 unsigned long lastUpdateTs = 0;
 
-int skip = 2;
+int skip = 9;
+unsigned long t = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -40,8 +41,8 @@ void loop() {
   }
   
   
-  unsigned long now = millis();
-  if (now - lastUpdateTs >= 50) {
+  unsigned long now = micros();
+  if (now - lastUpdateTs >= 100000) {
     float smoothed = smooth9(values);    
     float out = lastValue + cutoff * (smoothed - lastValue);
         
@@ -51,11 +52,11 @@ void loop() {
     if (skip <= 0) {
       Serial.print(rawD);
       Serial.print("\t");
-      Serial.print(filteredD);
-      Serial.print("\t");    
-      Serial.print(value);
-      Serial.print("\t");
-      Serial.println(out);      
+      Serial.println(filteredD);
+//      Serial.print("\t");    
+//      Serial.print(value);
+//      Serial.print("\t");
+//      Serial.println(out);      
     } else {
       skip--;
     }

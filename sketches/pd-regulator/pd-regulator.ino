@@ -13,18 +13,22 @@
 #define POSITION_LIMIT  1500
 
 
-#define ANGLE_ZERO  493.4
+#define ANGLE_ZERO  497
 
-// -26.22131018  -7.50023911  -0.4472136   -1.30242157
+//-37.15237371  -9.92437418  -0.31622777  -3.42969041
+//-34.37967732  -7.76167968  -0.31622777  -3.4035304
 
-#define aKp  35.0
-#define aKd  4.0
+#define aKp  37.15
+#define aKd  9.92
 
-#define Kp  1.5
-#define Kd  2.4
+#define Kp  50.0 //todo: lower
+#define Kd  1.5
+
+#define P0  0
+#define V0  0.0
 
 
-const float g9[] = {0.02376257744, 0.06195534498, 0.1228439993, 0.185233293, 0.2124095706, 0.185233293, 0.1228439993, 0.06195534498, 0.02376257744 };
+const float g9[] = { 0.02376257744, 0.06195534498, 0.1228439993, 0.185233293, 0.2124095706, 0.185233293, 0.1228439993, 0.06195534498, 0.02376257744 };
 const float cutoff = 0.5;
 
 AnalogScanner scanner;
@@ -35,20 +39,20 @@ volatile int adcValue;
 CircularBuffer<float, 9> angles;
 
 float a = .0; // meters per second^2
-float v = .0; //meters per second
+float v = V0; //meters per second
 float f = 1000000.0; //micros per second
 
 int direction = HIGH;
-long position = 0;
+long position = P0;
 
 unsigned long stepDelay = 0;
 unsigned long lastStepTime = 0;
 
 unsigned long lastEvolutionTime = 0;
-unsigned long evolutionPeriod = f / 1000;
+unsigned long evolutionPeriod = 10000;
 
 unsigned long lastAngleUpdateTime = 0;
-unsigned long angleUpdatePeriod = f / 1000;
+unsigned long angleUpdatePeriod = 50000;
 float lastAngle = FLT_MIN;
 float filteredAngle = FLT_MIN;
 float lastFilteredAngle = FLT_MIN;
@@ -73,14 +77,16 @@ void loop() {
   evolveWorld();
   runMotor();
 
-//  if (i % 100 == 0) {
+//  if (i % 50 == 0) {
 //    Serial.print(filteredAngle, 6);
 //    Serial.print("\t");
-//    Serial.print(omega, 6);
+//    Serial.println(omega, 6);
 //    Serial.print("\t");
 //    Serial.print(float(position) / 10000.0, 6);
 //    Serial.print("\t");
-//    Serial.println(v, 6);
+//    Serial.print(v, 6);
+//    Serial.print("\t");
+//    Serial.println(a, 6);    
 //  }
 //  i++;
   
@@ -96,7 +102,7 @@ float getControl(float th, float omega, float x, float v) {
 void evolveWorld() {
   unsigned long now = micros();
   if (now - lastEvolutionTime >= evolutionPeriod) {
-    float a = getControl(filteredAngle, omega, float(position) / 10000.0, v);
+    a = getControl(filteredAngle, omega, float(position) / 10000.0, v);
     
     float dt = float(now - lastEvolutionTime) / f;
     v += a * dt;
@@ -109,16 +115,24 @@ void evolveWorld() {
 void updateAngleAndDerivative() {
 
   if (adcReady) {      
-    angles.push(normalizeAngle(adcValue));    
+    angles.push(adcValue);    
     adcReady = false;
   }
   
   unsigned long now = micros();
   if (now - lastAngleUpdateTime >= angleUpdatePeriod) {    
     if (angles.isFull()) {
-      float angle = smooth9(angles);
+      float angle = normalizeAngle(smooth9(angles));
       filteredAngle = lastAngle + cutoff * (angle - lastAngle);
       omega = (filteredAngle - lastFilteredAngle) * f / (now - lastAngleUpdateTime);
+      if (abs(omega) > 2.0) {
+        omega = FLT_MIN;
+      } else {
+//        Serial.print(filteredAngle, 6);
+//        Serial.print("\t");
+//        Serial.println(omega, 6);
+      }
+
   
       lastAngle = angle;
       lastFilteredAngle = filteredAngle;
@@ -167,7 +181,7 @@ void step() {
   digitalWrite(STEP_PIN, HIGH); 
   delayMicroseconds(PULSE_WIDTH); 
   digitalWrite(STEP_PIN, LOW);
-  position += (direction == HIGH) ? -1 : 1;
+  position += (direction == HIGH) ? 1: -1;
 }
 
 void onADC(int index, int pin, int value) {
