@@ -12,7 +12,7 @@ from lqr_solver import lqr, dlqr
 """
 
 g = 9.81
-L = 0.5
+L = 1.0
 
 A = np.matrix([
     [.0,    1.,     .0,     .0],
@@ -30,19 +30,19 @@ B = np.matrix([
 
 Q = np.matrix([
     [1.,   .0,     .0,     .0],
-    [.0,   1.,     .0,     .0],
-    [.0,   .0,     50000.,     .0],
-    [.0,   .0,     .0,     100.]    
+    [.0,   10.,     .0,     .0],
+    [.0,   .0,     10.,     .0],
+    [.0,   .0,     .0,     1.]    
 ])
 
-R = np.matrix([10000.])
+R = np.matrix([1.])
 
 K, X, eig = lqr(A, B, Q, R)
 print(K)
 print(X)
 print(eig)
 
-th = [pi / 16]
+th = [pi / 12]
 dth = [0.0]
 f = [0.0]
 v = [0.0]

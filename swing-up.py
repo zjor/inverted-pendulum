@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-from math import sin, cos, pi
+from math import sin, cos, pi, sqrt
 
 '''
 	Equations:
@@ -10,25 +10,33 @@ from math import sin, cos, pi
 
 L = 1.0
 g = 9.8
-th = [pi / 12]
+th = [pi]
 dth = [0.0]
 f = [0.0]
 v = [0.0]
 x = [0.0]
 x0 = 0.0
+max_th = abs(pi - th[0])
 
 dt = 0.01
-N = 10000
+N = 4000
 
-Kp = 44.0
-Kd = 14.0
+def agm(x, y):
+	a, g = x, y
+	while abs(a - g) > 0.001:
+		a = (a + g) / 2.0
+		g = sqrt(a * g)	
+	return a
 
-xKp = 3.1
-xKd = 4.8
+def getResonanceFreq(th):
+	return agm(1.0, cos(th / 2.0)) * sqrt(g / L)
+
+def getControl(theta, omega, x, v, t):
+	return cos(getResonanceFreq(max_th) * t)
 
 for i in range(0, N):
 
-	f.append((Kp * th[i] + Kd * dth[i] + xKp * (x[i] - x0) + xKd * v[i]))	
+	f.append(getControl(th[i], dth[i], x[i], v[i], i * dt))
 
 	d2th = (g * sin(th[i]) - f[i] * cos(th[i])) / L
 	dth1 = dth[i] + d2th * dt
@@ -36,11 +44,12 @@ for i in range(0, N):
 	v.append(v[i] + f[i] * dt)
 	x.append(x[i] + v[i] * dt)
 	
-	th.append(th[i] + dth1 * dt)
+	new_th = th[i] + dth1 * dt
+	th.append(new_th)
 	dth.append(dth1)
+	max_th = max(max_th, abs(pi - new_th))
 
-	if i == 5000:
-		x0 = 0.1
+print("Max theta: ", max_th)
 
 plt.figure(1)
 plt.subplot(211)
@@ -57,5 +66,3 @@ line_x, = plt.plot(range(0, N + 1), x, label = 'x')
 
 plt.legend([line_v, line_x])
 plt.show()
-
-

@@ -21,7 +21,7 @@
 #define aKp  37.15
 #define aKd  9.92
 
-#define Kp  50.0 //todo: lower
+#define Kp  16.0 //todo: lower
 #define Kd  1.5
 
 #define P0  0
