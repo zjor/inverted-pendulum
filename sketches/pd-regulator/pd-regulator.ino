@@ -17,12 +17,13 @@
 
 //-37.15237371  -9.92437418  -0.31622777  -3.42969041
 //-34.37967732  -7.76167968  -0.31622777  -3.4035304
+// 35 7.5 5.0 2.0
 
-#define aKp  37.15
-#define aKd  9.92
+#define aKp  50.0
+#define aKd  15.0
 
-#define Kp  16.0 //todo: lower
-#define Kd  1.5
+#define Kp  30.0
+#define Kd  6.0
 
 #define P0  0
 #define V0  0.0
@@ -77,10 +78,10 @@ void loop() {
   evolveWorld();
   runMotor();
 
-//  if (i % 50 == 0) {
+//  if (i % 10 == 0) {
 //    Serial.print(filteredAngle, 6);
 //    Serial.print("\t");
-//    Serial.println(omega, 6);
+//    Serial.print(omega, 6);
 //    Serial.print("\t");
 //    Serial.print(float(position) / 10000.0, 6);
 //    Serial.print("\t");
@@ -181,7 +182,7 @@ void step() {
   digitalWrite(STEP_PIN, HIGH); 
   delayMicroseconds(PULSE_WIDTH); 
   digitalWrite(STEP_PIN, LOW);
-  position += (direction == HIGH) ? 1: -1;
+  position += (direction == HIGH) ? -1: 1;
 }
 
 void onADC(int index, int pin, int value) {
