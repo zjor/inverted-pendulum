@@ -1,25 +1,21 @@
+#include <float.h>
 #include <AnalogScanner.h>
 #include <CircularBuffer.h>
 
 const float f = 1000000.0;
 const float g9[] = { 0.02376257744, 0.06195534498, 0.1228439993, 0.185233293, 0.2124095706, 0.185233293, 0.1228439993, 0.06195534498, 0.02376257744 };
 
-CircularBuffer<float, 9> values;
-
-const float cutoff = 0.5;
+CircularBuffer<float, 9> angles;
+CircularBuffer<float, 9> omegas;
 
 AnalogScanner scanner;
 
 volatile boolean adcReady = false;
 volatile int adcValue;
 
-float value;
-float lastValue;
-float lastFiltered;
 unsigned long lastUpdateTs = 0;
 
-int skip = 9;
-unsigned long t = 0;
+float lastAngle = FLT_MIN;
 
 void setup() {
   Serial.begin(115200);
@@ -32,38 +28,26 @@ void setup() {
 
 void loop() {
   
-  if (adcReady) {
-    
-    value = adcValue;
-    values.push(value);
-    
+  if (adcReady) {    
+    angles.push(adcValue - 500.0);    
     adcReady = false;
   }
-  
-  
+    
   unsigned long now = micros();
-  if (now - lastUpdateTs >= 100000) {
-    float smoothed = smooth9(values);    
-    float out = lastValue + cutoff * (smoothed - lastValue);
-        
-    float rawD = (smoothed - lastValue) * f / (now - lastUpdateTs);
-    float filteredD = (out - lastFiltered) * f / (now - lastUpdateTs);
-
-    if (skip <= 0) {
-      Serial.print(rawD);
-      Serial.print("\t");
-      Serial.println(filteredD);
-//      Serial.print("\t");    
-//      Serial.print(value);
-//      Serial.print("\t");
-//      Serial.println(out);      
-    } else {
-      skip--;
+  if (now - lastUpdateTs >= 10000) {
+    float angle = smooth9(angles);
+    if (lastAngle != FLT_MIN) {
+      float omega = (angle - lastAngle) * f / (now - lastUpdateTs);
+      omegas.push(omega);      
     }
-    
-    
-    lastFiltered = out;
-    lastValue = smoothed;
+
+    if (omegas.isFull()) {
+      Serial.print(angle, 6);
+      Serial.print("\t");
+      Serial.println(smooth9(omegas), 6);
+    }
+   
+    lastAngle = angle;
     lastUpdateTs = now;
   }
 }
