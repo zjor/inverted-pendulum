@@ -19,11 +19,11 @@
 //-34.37967732  -7.76167968  -0.31622777  -3.4035304
 // 35 7.5 5.0 2.0
 
-#define aKp  50.0
+#define aKp  45.0
 #define aKd  15.0
 
-#define Kp  30.0
-#define Kd  6.0
+#define Kp  0.3
+#define Kd  3.4
 
 #define P0  0
 #define V0  0.0
@@ -50,10 +50,10 @@ unsigned long stepDelay = 0;
 unsigned long lastStepTime = 0;
 
 unsigned long lastEvolutionTime = 0;
-unsigned long evolutionPeriod = 10000;
+unsigned long evolutionPeriod = 5000;
 
 unsigned long lastAngleUpdateTime = 0;
-unsigned long angleUpdatePeriod = 50000;
+unsigned long angleUpdatePeriod = 40000;
 float lastAngle = FLT_MIN;
 float filteredAngle = FLT_MIN;
 float lastFilteredAngle = FLT_MIN;
@@ -78,7 +78,7 @@ void loop() {
   evolveWorld();
   runMotor();
 
-//  if (i % 10 == 0) {
+//  if (i % 100 == 0) {
 //    Serial.print(filteredAngle, 6);
 //    Serial.print("\t");
 //    Serial.print(omega, 6);
@@ -128,11 +128,7 @@ void updateAngleAndDerivative() {
       omega = (filteredAngle - lastFilteredAngle) * f / (now - lastAngleUpdateTime);
       if (abs(omega) > 2.0) {
         omega = FLT_MIN;
-      } else {
-//        Serial.print(filteredAngle, 6);
-//        Serial.print("\t");
-//        Serial.println(omega, 6);
-      }
+      } 
 
   
       lastAngle = angle;

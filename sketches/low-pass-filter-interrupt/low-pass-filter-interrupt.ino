@@ -1,66 +1,93 @@
 #include <float.h>
-#include <AnalogScanner.h>
-#include <CircularBuffer.h>
+
+#define M 10
+#define N 9
 
 const float f = 1000000.0;
-const float g9[] = { 0.02376257744, 0.06195534498, 0.1228439993, 0.185233293, 0.2124095706, 0.185233293, 0.1228439993, 0.06195534498, 0.02376257744 };
 
-CircularBuffer<float, 9> angles;
-CircularBuffer<float, 9> omegas;
+const byte adcPin = 0;
+volatile int adcReading;
+volatile boolean adcDone;
+boolean adcStarted;
+int value;
 
-AnalogScanner scanner;
+int values[M];
+int ix = 0;
 
-volatile boolean adcReady = false;
-volatile int adcValue;
+float ds[N];
+int dIx;
 
-unsigned long lastUpdateTs = 0;
+float lastValue = FLT_MIN;
 
-float lastAngle = FLT_MIN;
+unsigned long samplesCount = 0;
+unsigned long lastTimestamp = 0;
+unsigned long angleInterval = 5000;
 
-void setup() {
-  Serial.begin(115200);
+void setup () {
+  Serial.begin (115200);
+  ADCSRA =  bit (ADEN);                     
+  ADCSRA |= bit (ADPS2);
+  ADMUX  =  bit (REFS0) | (adcPin & 0x07);
+}  
+
+ISR (ADC_vect) {
+  adcReading = ADC;
+  adcDone = true;  
+}  
   
-  scanner.setCallback(A0, onADC);
-  int order[] = {A0};  
-  scanner.setScanOrder(1, order);
-  scanner.beginScanning();
-}
-
-void loop() {
-  
-  if (adcReady) {    
-    angles.push(adcValue - 500.0);    
-    adcReady = false;
+void loop () {
+  if (adcDone) {
+    adcStarted = false;
+    value = adcReading;
+    samplesCount++;
+    adcDone = false;
   }
     
-  unsigned long now = micros();
-  if (now - lastUpdateTs >= 10000) {
-    float angle = smooth9(angles);
-    if (lastAngle != FLT_MIN) {
-      float omega = (angle - lastAngle) * f / (now - lastUpdateTs);
-      omegas.push(omega);      
-    }
-
-    if (omegas.isFull()) {
-      Serial.print(angle, 6);
-      Serial.print("\t");
-      Serial.println(smooth9(omegas), 6);
-    }
-   
-    lastAngle = angle;
-    lastUpdateTs = now;
+  if (!adcStarted) {
+    adcStarted = true;
+    ADCSRA |= bit (ADSC) | bit (ADIE);
   }
+
+  values[ix++] = value;
+  ix = (ix >= M) ? 0 : ix;  
+
+  unsigned long now = millis();
+  if (now - lastTimestamp >= 10) {
+    float sVal = smooth(values);
+    float dt = (float) 10.0 / 1000.0;
+    float d = (sVal - lastValue) / dt;
+    
+    ds[dIx++] = d;
+    dIx = (dIx >= N) ? 0 : dIx;
+    
+    if (lastValue != FLT_MIN && fabs(d) < 5000.0) {
+      Serial.print(samplesCount);
+      Serial.print("\t");
+      Serial.print(sVal);
+      Serial.print("\t");
+      Serial.println(fsmooth(ds), 6);
+    }
+    samplesCount = 0;
+    lastValue = sVal;
+    lastTimestamp = now;
+  }
+  
 }
 
-float smooth9(CircularBuffer<float, 9> &buf) {  
-  float avg = .0;
-  for (long i = 0; i < 9; i++) {
-    avg += g9[i] * buf[i];
-  }  
-  return avg;
+const float g9[] = { 0.02376257744, 0.06195534498, 0.1228439993, 0.185233293, 0.2124095706, 0.185233293, 0.1228439993, 0.06195534498, 0.02376257744 };
+
+float smooth(int values[]) {
+  float val = .0;
+  for (int i = 0; i < M; i++) {
+    val += values[i];
+  }
+  return val / M;
 }
 
-void onADC(int index, int pin, int value) {
-  adcValue = value;
-  adcReady = true;
+float fsmooth(float values[]) {
+  float val = .0;
+  for (int i = 0; i < N; i++) {
+    val += ((float)values[i]) * g9[i];
+  }
+  return val;
 }
