@@ -4,7 +4,6 @@
 #include <float.h>
 #include <limits.h>
 #include <AnalogScanner.h>
-#include <CircularBuffer.h>
  
 #define STEP_PIN    9
 #define DIR_PIN     10
@@ -12,32 +11,28 @@
 
 #define POSITION_LIMIT  1500
 
-
 #define ANGLE_ZERO  497
 
 //-37.15237371  -9.92437418  -0.31622777  -3.42969041
 //-34.37967732  -7.76167968  -0.31622777  -3.4035304
 // 35 7.5 5.0 2.0
 
-#define aKp  45.0
-#define aKd  15.0
+#define OMEGA_SCALER  100.0
 
-#define Kp  0.3
-#define Kd  3.4
+#define aKp  65.0
+#define aKd  40.0
+
+#define Kp  7.5
+#define Kd  1.5
 
 #define P0  0
 #define V0  0.0
-
-
-const float g9[] = { 0.02376257744, 0.06195534498, 0.1228439993, 0.185233293, 0.2124095706, 0.185233293, 0.1228439993, 0.06195534498, 0.02376257744 };
-const float cutoff = 0.5;
 
 AnalogScanner scanner;
 
 volatile boolean adcReady = false;
 volatile int adcValue;
-
-CircularBuffer<float, 9> angles;
+int rawAngle;
 
 float a = .0; // meters per second^2
 float v = V0; //meters per second
@@ -50,13 +45,12 @@ unsigned long stepDelay = 0;
 unsigned long lastStepTime = 0;
 
 unsigned long lastEvolutionTime = 0;
-unsigned long evolutionPeriod = 5000;
+unsigned long evolutionPeriod = 5007;
 
 unsigned long lastAngleUpdateTime = 0;
-unsigned long angleUpdatePeriod = 40000;
+unsigned long angleUpdatePeriod = 1013;
+float angle = FLT_MIN;
 float lastAngle = FLT_MIN;
-float filteredAngle = FLT_MIN;
-float lastFilteredAngle = FLT_MIN;
 float omega = FLT_MIN;
 
 void setup() {  
@@ -79,7 +73,7 @@ void loop() {
   runMotor();
 
 //  if (i % 100 == 0) {
-//    Serial.print(filteredAngle, 6);
+//    Serial.print(angle, 6);
 //    Serial.print("\t");
 //    Serial.print(omega, 6);
 //    Serial.print("\t");
@@ -103,41 +97,34 @@ float getControl(float th, float omega, float x, float v) {
 void evolveWorld() {
   unsigned long now = micros();
   if (now - lastEvolutionTime >= evolutionPeriod) {
-    a = getControl(filteredAngle, omega, float(position) / 10000.0, v);
-    
-    float dt = float(now - lastEvolutionTime) / f;
-    v += a * dt;
+    a = getControl(angle, omega, float(position) / 10000.0, v);
+    v += a * (now - lastEvolutionTime) / f;
     stepDelay = getStepDelay(v);
     lastEvolutionTime = now;
   }
 }
 
-//state variables: filteredAngle, omega
 void updateAngleAndDerivative() {
 
   if (adcReady) {      
-    angles.push(adcValue);    
+    rawAngle = adcValue;
     adcReady = false;
   }
   
   unsigned long now = micros();
   if (now - lastAngleUpdateTime >= angleUpdatePeriod) {    
-    if (angles.isFull()) {
-      float angle = normalizeAngle(smooth9(angles));
-      filteredAngle = lastAngle + cutoff * (angle - lastAngle);
-      omega = (filteredAngle - lastFilteredAngle) * f / (now - lastAngleUpdateTime);
-      if (abs(omega) > 2.0) {
-        omega = FLT_MIN;
-      } 
+      angle = normalizeAngle(rawAngle);
 
-  
+      if (lastAngle != FLT_MIN) {
+        omega = (angle - lastAngle) * f / (now - lastAngleUpdateTime) / OMEGA_SCALER;        
+      }
+ 
       lastAngle = angle;
-      lastFilteredAngle = filteredAngle;
-    }
+    
     lastAngleUpdateTime = now;
   }
-  
 }
+  
 
 float normalizeAngle(int value) {  
   return fmap(value, 0, 1024, 0, 2.0 * PI) - fmap(ANGLE_ZERO, 0, 1024, 0, 2.0 * PI);
@@ -147,13 +134,6 @@ float fmap(float x, float in_min, float in_max, float out_min, float out_max){
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-float smooth9(CircularBuffer<float, 9> &buf) {  
-  float avg = .0;
-  for (long i = 0; i < 9; i++) {
-    avg += g9[i] * buf[i];
-  }  
-  return avg;
-}
 
 unsigned long getStepDelay(float speed) {
   direction = (speed > 0.0) ? HIGH : LOW;
