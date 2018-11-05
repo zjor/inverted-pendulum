@@ -9,7 +9,7 @@
 #define DIR_PIN     10
 #define PULSE_WIDTH 4
 
-#define POSITION_LIMIT  1500
+#define POSITION_LIMIT  1700
 
 #define ANGLE_ZERO  497
 
@@ -19,11 +19,11 @@
 
 #define OMEGA_SCALER  100.0
 
-#define aKp  65.0
-#define aKd  40.0
+#define aKp  45.0
+#define aKd  15.0
 
-#define Kp  7.5
-#define Kd  1.5
+#define Kp  0.5
+#define Kd  3.5
 
 #define P0  0
 #define V0  0.0
@@ -48,7 +48,7 @@ unsigned long lastEvolutionTime = 0;
 unsigned long evolutionPeriod = 5007;
 
 unsigned long lastAngleUpdateTime = 0;
-unsigned long angleUpdatePeriod = 1013;
+unsigned long angleUpdatePeriod = 2013;
 float angle = FLT_MIN;
 float lastAngle = FLT_MIN;
 float omega = FLT_MIN;
@@ -69,7 +69,6 @@ long i = 0;
 
 void loop() {
   updateAngleAndDerivative();
-  evolveWorld();
   runMotor();
 
 //  if (i % 100 == 0) {
@@ -94,14 +93,10 @@ float getControl(float th, float omega, float x, float v) {
   return - (Kp * x + Kd * v + aKp * th + aKd * omega);
 }
 
-void evolveWorld() {
-  unsigned long now = micros();
-  if (now - lastEvolutionTime >= evolutionPeriod) {
-    a = getControl(angle, omega, float(position) / 10000.0, v);
-    v += a * (now - lastEvolutionTime) / f;
-    stepDelay = getStepDelay(v);
-    lastEvolutionTime = now;
-  }
+void evolveWorld(float dt) {
+  a = getControl(angle, omega, float(position) / 10000.0, v);
+  v += a * dt;
+  stepDelay = getStepDelay(v);
 }
 
 void updateAngleAndDerivative() {
@@ -116,7 +111,9 @@ void updateAngleAndDerivative() {
       angle = normalizeAngle(rawAngle);
 
       if (lastAngle != FLT_MIN) {
-        omega = (angle - lastAngle) * f / (now - lastAngleUpdateTime) / OMEGA_SCALER;        
+        float dt = 1.0 * (now - lastAngleUpdateTime) / f;
+        omega = (angle - lastAngle) / dt / OMEGA_SCALER;
+        evolveWorld(dt);
       }
  
       lastAngle = angle;
