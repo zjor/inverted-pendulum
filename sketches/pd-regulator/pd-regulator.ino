@@ -11,7 +11,7 @@
 
 #define POSITION_LIMIT  1700
 
-#define ANGLE_ZERO  497
+#define ANGLE_ZERO  521.5
 
 //-37.15237371  -9.92437418  -0.31622777  -3.42969041
 //-34.37967732  -7.76167968  -0.31622777  -3.4035304
@@ -19,11 +19,11 @@
 
 #define OMEGA_SCALER  100.0
 
-#define aKp  45.0
-#define aKd  15.0
+#define aKp  65.0
+#define aKd  400.0
 
-#define Kp  0.5
-#define Kd  3.5
+#define Kp  1.0
+#define Kd  0.5
 
 #define P0  0
 #define V0  0.0
@@ -71,7 +71,7 @@ void loop() {
   updateAngleAndDerivative();
   runMotor();
 
-//  if (i % 100 == 0) {
+//  if (i % 500 == 0) {
 //    Serial.print(angle, 6);
 //    Serial.print("\t");
 //    Serial.print(omega, 6);
