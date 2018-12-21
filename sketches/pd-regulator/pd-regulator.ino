@@ -11,7 +11,7 @@
 
 #define POSITION_LIMIT  1700
 
-#define ANGLE_ZERO  521.5
+#define ANGLE_ZERO  497.8
 
 //-37.15237371  -9.92437418  -0.31622777  -3.42969041
 //-34.37967732  -7.76167968  -0.31622777  -3.4035304
@@ -20,10 +20,10 @@
 #define OMEGA_SCALER  100.0
 
 #define aKp  65.0
-#define aKd  400.0
+#define aKd  445.0
 
-#define Kp  1.0
-#define Kd  0.5
+#define Kp  1.2
+#define Kd  0.4
 
 #define P0  0
 #define V0  0.0
@@ -62,7 +62,7 @@ void setup() {
   scanner.setScanOrder(1, order);
   scanner.beginScanning();
   
-//  Serial.begin(115200);
+  Serial.begin(115200);
 }
 
 long i = 0;
@@ -72,6 +72,8 @@ void loop() {
   runMotor();
 
 //  if (i % 500 == 0) {
+//    Serial.print(rawAngle);
+//    Serial.print("\t");    
 //    Serial.print(angle, 6);
 //    Serial.print("\t");
 //    Serial.print(omega, 6);
