@@ -1,17 +1,6 @@
 const { sin, cos, sqrt, abs, PI } = Math
-const agm = (x, y) => {
-	let [a, g] = [x, y]
-	while (Math.abs(a - g) > 0.001) {
-		[a, g] = [0.5 * (a + g), Math.sqrt(a * g)]
-	}
-	return a
-}
-const getW = (angle, l, g) => {
-	console.log(`angle = ${angle}; L = ${l}; g = ${g}`)
-	return agm(1.0, Math.cos(angle / 2)) * Math.sqrt(g / l)
-}
 
-const width = 400
+const width = 800
 const heigth = 300
 const boxWidth = 40
 const boxHeight = 20
@@ -23,7 +12,7 @@ const g = 9.8
 let x0 = 0.0
 
 let x = 0.0
-let theta = PI
+let theta = PI - 0.3
 
 // z = theta'
 let z = 0.0
@@ -47,8 +36,8 @@ function draw(ctx) {
 	ctx.rect(tX - boxWidth / 2, boxY - boxHeight / 2, boxWidth, boxHeight)
 
 	const scaledL = l * scale
-	const rodX = scaledL * Math.sin(theta) + tX
-	const rodY = boxY - scaledL * Math.cos(theta)
+	const rodX = scaledL * sin(theta) + tX
+	const rodY = boxY - scaledL * cos(theta)
 	ctx.moveTo(tX, boxY)
 	ctx.lineTo(rodX, rodY)	
 	ctx.stroke()
@@ -57,7 +46,7 @@ function draw(ctx) {
 	ctx.arc(rodX, rodY, 10, 0, 2.0 * Math.PI)
 	ctx.stroke()
 
-	const thetaVisual = round((theta * 180.0 / Math.PI) % 360)
+	const thetaVisual = round((theta * 180.0 / PI) % 360)
 	ctx.strokeText("Theta: " + thetaVisual, 5, 15)
 	ctx.strokeText("Energy: " + round(energy().total), 5, 45)
 
@@ -79,39 +68,15 @@ function energy() {
 }
 
 function normTheta(th) {
-	let nTh = th % (Math.PI * 2.0)
-	return (nTh > Math.PI) ? nTh - 2 * Math.PI : nTh
+	let nTh = th % (PI * 2.0)
+	return (nTh > PI) ? nTh - 2 * PI : nTh
 }
 
-let w = Math.sqrt(g / l)
-const T0 = 2.0 * Math.PI / w
-let T = T0
-let A = 4.0
-let isSwinging = false
-let swingTime = 0.0
-
 function control(th, dth, x, dx, t) {
-	if (isSwinging) {
-		if (swingTime > 3 * T / 4 && abs(dx) < 0.05) {
-			isSwinging = false
-			console.log("Swing stopped")			
-		}
-		swingTime += h
-		return A * cos(w * swingTime)
+	if (abs(normTheta(th)) < PI / 6) {
+		return Kp * normTheta(th) + Kd * dth + xKp * (x - x0) + xKd * dx
 	} else {
-		if (abs(dth) < 0.01 && th >= PI) {
-			isSwinging = true
-			swingTime = 0.0
-			w = getW(abs(PI - th), l, g)
-			T = 2.0 * Math.PI / w
-			A = 4.0 * T0 / T
-			console.log("new W =", w, "new T =", T)
-		}
-		if (abs(normTheta(th)) < PI / 6) {
-			return Kp * normTheta(th) + Kd * dth + xKp * (x - x0) + xKd * dx
-		} else {
-			return 0.0
-		}
+		return 5.0 * abs(PI - th) / PI * dth	
 	}
 }
 
