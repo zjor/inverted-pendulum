@@ -11,7 +11,7 @@ const l = 10
 const g = 9.8
 let x0 = 0.0
 
-let x = 0.0
+let x = -10.0
 let theta = PI - 0.3
 
 // z = theta'
@@ -20,7 +20,7 @@ let z = 0.0
 let y = 0.0
 
 let t = 0.0
-const h = 0.01
+const h = 0.05
 
 const round = (n) => Math.round(n * 100.0) / 100.0
 
@@ -48,6 +48,7 @@ function draw(ctx) {
 
 	const thetaVisual = round((theta * 180.0 / PI) % 360)
 	ctx.strokeText("Theta: " + thetaVisual, 5, 15)
+	ctx.strokeText("Position: " + round(x), 5, 30)
 	ctx.strokeText("Energy: " + round(energy().total), 5, 45)
 
 	integrate(h)
@@ -55,11 +56,11 @@ function draw(ctx) {
 	
 }
 
-const Kp = 100.0
-const Kd = 50.0
+const Kp = 80.0
+const Kd = 100.0
 
-const xKp = 2.0
-const xKd = 3.5
+const xKp = 0.5
+const xKd = 1.0
 
 function energy() {
 	const p = l * (1 + cos(theta)) * m * g
@@ -73,10 +74,17 @@ function normTheta(th) {
 }
 
 function control(th, dth, x, dx, t) {
-	if (abs(normTheta(th)) < PI / 6) {
+	const threshold = PI / 6
+	const complement = PI - threshold
+
+	if (abs(normTheta(th)) < threshold && abs(dth) < 0.2) {
 		return Kp * normTheta(th) + Kd * dth + xKp * (x - x0) + xKd * dx
 	} else {
-		return 5.0 * abs(PI - th) / PI * dth	
+		if (abs(th) > PI / 2) {
+			return 2.0 * abs(complement - th) / complement * dth
+		} else {
+			return 0.0
+		}
 	}
 }
 
