@@ -79,7 +79,7 @@ ax = fig.add_subplot(111, autoscale_on=False, xlim=(-2, 2), ylim=(-2, 2))
 ax.set_aspect('equal')
 ax.grid()
 
-patch = ax.add_patch(Rectangle((0, 0), 0, 0, fill=True, linewidth=1,edgecolor='r',facecolor='none'))
+patch = ax.add_patch(Rectangle((0, 0), 0, 0, linewidth=1, edgecolor='k', facecolor='g'))
 
 line, = ax.plot([], [], 'o-', lw=2)
 time_template = 'time = %.1fs'
