@@ -1,8 +1,9 @@
 """
-Simulation of a free pendulum
+Simulation of a free-cart pendulum
 
-Equation:
-	Th'' = - g / L * sin(Th)
+System of equations of motion:
+	L * th'' = -g * sin(th) + x'' * cos(th),
+	(m + M) * x'' + m * th'' * L * cos(th) - m * L * Th'^2 * sin(th) = 0
 
 System:
 	Th' = Y
