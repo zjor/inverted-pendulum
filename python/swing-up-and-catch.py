@@ -142,6 +142,6 @@ pp.show()
 
 
 # Set up formatting for the movie files
-Writer = animation.writers['ffmpeg']
-writer = Writer(fps=20, metadata=dict(artist='Sergey Royz'), bitrate=1800)
-ani.save('catching-pendulum.mp4', writer=writer)
+# Writer = animation.writers['ffmpeg']
+# writer = Writer(fps=20, metadata=dict(artist='Sergey Royz'), bitrate=1800)
+# ani.save('catching-pendulum.mp4', writer=writer)
