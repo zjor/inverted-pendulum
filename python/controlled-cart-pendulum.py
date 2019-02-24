@@ -41,8 +41,8 @@ x = .0		# cart position
 x0 = 0		# desired cart position
 Z = .0		# cart velocity
 
-Kp_th = 44
-Kd_th = 10
+Kp_th = 50
+Kd_th = 15
 Kp_x = 3.1
 Kd_x = 4.8
 
@@ -71,7 +71,7 @@ def derivatives(state, t):
 	u = Kp_th * _th + Kd_th * _Y + Kp_x * (_x - x0) + Kd_x * _Z
 
 	ds[0] = state[1]
-	ds[1] = (g * sin(_th) - u * cos(_th))
+	ds[1] = (g * sin(_th) - u * cos(_th)) / L
 	ds[2] = state[3]
 	ds[3] = u
 
