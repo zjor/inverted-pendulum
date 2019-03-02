@@ -7,26 +7,21 @@
  
 #define STEP_PIN    9
 #define DIR_PIN     10
-#define PULSE_WIDTH 4
+#define PULSE_WIDTH 2
 
 #define POSITION_LIMIT  1700
 
-#define ANGLE_ZERO  497.8
+#define ANGLE_ZERO  506.95
 
-//-37.15237371  -9.92437418  -0.31622777  -3.42969041
-//-34.37967732  -7.76167968  -0.31622777  -3.4035304
-// 35 7.5 5.0 2.0
+#define aKp  100.0
+#define aKd  4.0
 
-#define OMEGA_SCALER  100.0
-
-#define aKp  65.0
-#define aKd  445.0
-
-#define Kp  1.2
-#define Kd  0.4
+#define Kp  1.0
+#define Kd  1.0
 
 #define P0  0
 #define V0  0.0
+#define x0  0.0
 
 AnalogScanner scanner;
 
@@ -34,9 +29,10 @@ volatile boolean adcReady = false;
 volatile int adcValue;
 int rawAngle;
 
-float a = .0; // meters per second^2
-float v = V0; //meters per second
-float f = 1000000.0; //micros per second
+float a = .0;         // meters per second^2
+float v = V0;         // meters per second
+float f = 1000000.0;  // micros per second
+float x = x0;         // calculated position
 
 int direction = HIGH;
 long position = P0;
@@ -48,7 +44,7 @@ unsigned long lastEvolutionTime = 0;
 unsigned long evolutionPeriod = 5007;
 
 unsigned long lastAngleUpdateTime = 0;
-unsigned long angleUpdatePeriod = 2013;
+unsigned long angleUpdatePeriod = 1500;
 float angle = FLT_MIN;
 float lastAngle = FLT_MIN;
 float omega = FLT_MIN;
@@ -71,21 +67,25 @@ void loop() {
   updateAngleAndDerivative();
   runMotor();
 
-//  if (i % 500 == 0) {
+  if (i % 50 == 0) {
 //    Serial.print(rawAngle);
 //    Serial.print("\t");    
 //    Serial.print(angle, 6);
 //    Serial.print("\t");
 //    Serial.print(omega, 6);
 //    Serial.print("\t");
-//    Serial.print(float(position) / 10000.0, 6);
+//    Serial.print(x, 6);
 //    Serial.print("\t");
 //    Serial.print(v, 6);
 //    Serial.print("\t");
 //    Serial.println(a, 6);    
-//  }
-//  i++;
+  }
+  i++;
   
+}
+
+float swingUpControl(float th, float dth) {
+  return 0.0;
 }
 
 float getControl(float th, float omega, float x, float v) {
@@ -96,8 +96,9 @@ float getControl(float th, float omega, float x, float v) {
 }
 
 void evolveWorld(float dt) {
-  a = getControl(angle, omega, float(position) / 10000.0, v);
+  a = getControl(angle, omega, x, v);
   v += a * dt;
+  x += v * dt;
   stepDelay = getStepDelay(v);
 }
 
@@ -114,7 +115,7 @@ void updateAngleAndDerivative() {
 
       if (lastAngle != FLT_MIN) {
         float dt = 1.0 * (now - lastAngleUpdateTime) / f;
-        omega = (angle - lastAngle) / dt / OMEGA_SCALER;
+        omega = (angle - lastAngle) / dt;
         evolveWorld(dt);
       }
  
@@ -126,7 +127,7 @@ void updateAngleAndDerivative() {
   
 
 float normalizeAngle(int value) {  
-  return fmap(value, 0, 1024, 0, 2.0 * PI) - fmap(ANGLE_ZERO, 0, 1024, 0, 2.0 * PI);
+  return fmap(value - ANGLE_ZERO, 0, 1024, 0, 2.0 * PI);
 }
 
 float fmap(float x, float in_min, float in_max, float out_min, float out_max){
@@ -157,7 +158,7 @@ void step() {
   digitalWrite(STEP_PIN, HIGH); 
   delayMicroseconds(PULSE_WIDTH); 
   digitalWrite(STEP_PIN, LOW);
-  position += (direction == HIGH) ? -1: 1;
+  position += (direction == HIGH) ? 1: -1;
 }
 
 void onADC(int index, int pin, int value) {
