@@ -3,7 +3,6 @@
  */
 #include <float.h>
 #include <limits.h>
-#include <AnalogScanner.h>
  
 #define STEP_PIN    9
 #define DIR_PIN     10
@@ -14,16 +13,14 @@
 #define ANGLE_ZERO  506.85
 
 #define aKp  100.0
-#define aKd  4.0
+#define aKd  4.5
 
-#define Kp  3.0
+#define Kp  1.5
 #define Kd  1.0
 
 #define P0  0
 #define V0  0.0
 #define x0  0.0
-
-AnalogScanner scanner;
 
 volatile boolean adcReady = false;
 volatile int adcValue;
@@ -50,15 +47,23 @@ float angle = .0;
 float lastAngle = .0;
 float omega = .0;
 
+void adc_init() {
+    ADMUX  = _BV(REFS0)    // ref = AVCC
+           | 0;         // input channel
+    ADCSRB = 0;          // free running mode
+    ADCSRA = _BV(ADEN)   // enable
+           | _BV(ADSC)   // start conversion
+           | _BV(ADATE)  // auto trigger enable
+           | _BV(ADIF)   // clear interrupt flag
+           | _BV(ADIE)   // interrupt enable
+           | 7;          // prescaler = 128
+}
+
 void setup() {  
   pinMode(STEP_PIN, OUTPUT); 
   pinMode(DIR_PIN, OUTPUT);
-
-  scanner.setCallback(A0, onADC);
-  int order[] = {A0};  
-  scanner.setScanOrder(1, order);
-  scanner.beginScanning();
   
+  adc_init();
   Serial.begin(115200);
 }
 
@@ -129,7 +134,6 @@ void updateAngleAndDerivative() {
     lastAngleUpdateTime = now;
   }
 }
-  
 
 float normalizeAngle(int value) {  
   return fmap(value - ANGLE_ZERO, 0, 1024, 0, 2.0 * PI);
@@ -165,7 +169,7 @@ void step() {
   position += (direction == HIGH) ? 1: -1;
 }
 
-void onADC(int index, int pin, int value) {
-  adcValue = value;
-  adcReady = true;
+ISR (ADC_vect) {
+  adcValue = ADC;
+  adcReady = true;  
 }
