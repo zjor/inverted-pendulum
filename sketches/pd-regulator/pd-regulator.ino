@@ -10,13 +10,14 @@
 
 #define POSITION_LIMIT  1700
 
-#define ANGLE_ZERO  506.85
+// upright zero angle measurement
+#define ANGLE_ZERO  505.85
 
-#define aKp  100.0
-#define aKd  4.5
+#define aKp  120.0
+#define aKd  8.0
 
-#define Kp  1.5
-#define Kd  1.0
+#define Kp  1.2
+#define Kd  0.5
 
 #define P0  0
 #define V0  0.0
@@ -45,11 +46,14 @@ unsigned long stepDelay = 0;
 unsigned long lastStepTime = 0;
 
 unsigned long lastAngleUpdateTime = 0;
-unsigned long angleUpdatePeriod = 1500;
+
+// angle update and integration period in microseconds
+unsigned long angleUpdatePeriod = 5000;
 
 float angle = .0;
 float lastAngle = .0;
 float omega = .0;
+float lastOmega = .0;
 
 void adc_init() {
     ADMUX  = _BV(REFS0)    // ref = AVCC
@@ -129,14 +133,15 @@ void updateAngleAndDerivative() {
   
   unsigned long now = micros();
   if (now - lastAngleUpdateTime >= angleUpdatePeriod) {    
-      angle = normalizeAngle(rawAngle);
+    angle = normalizeAngle(rawAngle);
 
-      float dt = 1.0 * (now - lastAngleUpdateTime) / f;
-      omega = (angle - lastAngle) / dt;
-      
-      integrate(dt);
- 
-      lastAngle = angle;
+    float dt = 1.0 * (now - lastAngleUpdateTime) / f;
+    omega = (angle - lastAngle) / dt;
+//    omega = (omega + lastOmega) / 2;
+    
+    integrate(dt);
+    lastAngle = angle;
+    lastOmega = omega;
     
     lastAngleUpdateTime = now;
   }
