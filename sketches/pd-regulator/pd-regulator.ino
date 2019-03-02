@@ -11,12 +11,12 @@
 
 #define POSITION_LIMIT  1700
 
-#define ANGLE_ZERO  506.95
+#define ANGLE_ZERO  506.85
 
 #define aKp  100.0
 #define aKd  4.0
 
-#define Kp  1.0
+#define Kp  3.0
 #define Kd  1.0
 
 #define P0  0
@@ -27,6 +27,9 @@ AnalogScanner scanner;
 
 volatile boolean adcReady = false;
 volatile int adcValue;
+
+boolean isStabilizing = false;
+
 int rawAngle;
 
 float a = .0;         // meters per second^2
@@ -40,14 +43,12 @@ long position = P0;
 unsigned long stepDelay = 0;
 unsigned long lastStepTime = 0;
 
-unsigned long lastEvolutionTime = 0;
-unsigned long evolutionPeriod = 5007;
-
 unsigned long lastAngleUpdateTime = 0;
 unsigned long angleUpdatePeriod = 1500;
-float angle = FLT_MIN;
-float lastAngle = FLT_MIN;
-float omega = FLT_MIN;
+
+float angle = .0;
+float lastAngle = .0;
+float omega = .0;
 
 void setup() {  
   pinMode(STEP_PIN, OUTPUT); 
@@ -67,7 +68,7 @@ void loop() {
   updateAngleAndDerivative();
   runMotor();
 
-  if (i % 50 == 0) {
+//  if (i % 500 == 0) {
 //    Serial.print(rawAngle);
 //    Serial.print("\t");    
 //    Serial.print(angle, 6);
@@ -79,8 +80,8 @@ void loop() {
 //    Serial.print(v, 6);
 //    Serial.print("\t");
 //    Serial.println(a, 6);    
-  }
-  i++;
+//  }
+//  i++;
   
 }
 
@@ -89,7 +90,7 @@ float swingUpControl(float th, float dth) {
 }
 
 float getControl(float th, float omega, float x, float v) {
-  if (omega == FLT_MIN) {
+  if (!isStabilizing) {
     return 0.0;
   }
   return - (Kp * x + Kd * v + aKp * th + aKd * omega);
@@ -102,22 +103,26 @@ void evolveWorld(float dt) {
   stepDelay = getStepDelay(v);
 }
 
+inline boolean isControllable(int angle) {
+  return abs(rawAngle - ANGLE_ZERO) < 3;
+}
+
 void updateAngleAndDerivative() {
 
   if (adcReady) {      
     rawAngle = adcValue;
     adcReady = false;
+    isStabilizing = (!isStabilizing && isControllable(rawAngle)) || isStabilizing;
   }
   
   unsigned long now = micros();
   if (now - lastAngleUpdateTime >= angleUpdatePeriod) {    
       angle = normalizeAngle(rawAngle);
 
-      if (lastAngle != FLT_MIN) {
-        float dt = 1.0 * (now - lastAngleUpdateTime) / f;
-        omega = (angle - lastAngle) / dt;
-        evolveWorld(dt);
-      }
+      float dt = 1.0 * (now - lastAngleUpdateTime) / f;
+      omega = (angle - lastAngle) / dt;
+      
+      evolveWorld(dt);
  
       lastAngle = angle;
     
@@ -144,7 +149,6 @@ void runMotor() {
   unsigned long now = micros();
   if (now - lastStepTime >= stepDelay) {
     step();
-    stepDelay = getStepDelay(v);   
     lastStepTime = now;  
   }
 }
