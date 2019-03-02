@@ -11,13 +11,13 @@
 #define POSITION_LIMIT  1700
 
 // upright zero angle measurement
-#define ANGLE_ZERO  505.85
+#define ANGLE_ZERO  505.75
 
-#define aKp  120.0
-#define aKd  8.0
+#define aKp  80.0
+#define aKd  6.0
 
-#define Kp  1.2
-#define Kd  0.5
+#define Kp  1.6
+#define Kd  0.9
 
 #define P0  0
 #define V0  0.0
@@ -91,7 +91,7 @@ void loop() {
 //    Serial.print(x, 6);
 //    Serial.print("\t");
 //    Serial.print(v, 6);
-//    Serial.print("\t");
+//    Serial.print("\t");    
 //    Serial.println(a, 6);    
 //  }
 //  i++;
@@ -99,7 +99,7 @@ void loop() {
 }
 
 float swingUpControl(float th, float dth) {
-  return 0.0;
+  return -0.2 * dth * cos(th);
 }
 
 float getControl(float th, float omega, float x, float v) {
@@ -111,6 +111,7 @@ float getControl(float th, float omega, float x, float v) {
 
 void integrate(float dt) {
   a = getControl(angle, omega, x, v);
+//  a = swingUpControl(angle, omega);
   v += (a + last_a) * dt / 2;
   x += (v + last_v) * dt / 2;
   stepDelay = getStepDelay(v);
@@ -157,8 +158,8 @@ float fmap(float x, float in_min, float in_max, float out_min, float out_max){
 
 
 unsigned long getStepDelay(float speed) {
-  direction = (speed > 0.0) ? HIGH : LOW;
-  return (speed == 0) ? ULONG_MAX : (f / fabs(10000.0 * speed) - PULSE_WIDTH);
+  direction = (speed > 0.0) ? HIGH : LOW;  
+  return max(400, (speed == 0) ? ULONG_MAX : (f / fabs(10000.0 * speed) - PULSE_WIDTH));
 }
 
 void runMotor() {
