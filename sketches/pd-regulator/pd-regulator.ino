@@ -34,6 +34,10 @@ float v = V0;         // meters per second
 float f = 1000000.0;  // micros per second
 float x = x0;         // calculated position
 
+// prevoius values for improved Euler's method
+float last_a = .0;
+float last_v = .0;
+
 int direction = HIGH;
 long position = P0;
 
@@ -101,11 +105,14 @@ float getControl(float th, float omega, float x, float v) {
   return - (Kp * x + Kd * v + aKp * th + aKd * omega);
 }
 
-void evolveWorld(float dt) {
+void integrate(float dt) {
   a = getControl(angle, omega, x, v);
-  v += a * dt;
-  x += v * dt;
+  v += (a + last_a) * dt / 2;
+  x += (v + last_v) * dt / 2;
   stepDelay = getStepDelay(v);
+  
+  last_a = a;
+  last_v = v;
 }
 
 inline boolean isControllable(int angle) {
@@ -127,7 +134,7 @@ void updateAngleAndDerivative() {
       float dt = 1.0 * (now - lastAngleUpdateTime) / f;
       omega = (angle - lastAngle) / dt;
       
-      evolveWorld(dt);
+      integrate(dt);
  
       lastAngle = angle;
     
