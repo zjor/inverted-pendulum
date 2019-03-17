@@ -88,17 +88,20 @@ def solve_manual(state, t, k):
 	th_h = [state[2]]
 	Y_h = [state[3]]
 	for i in range(len(t) - 1):
+
+		dist = disturbance(t[i], 1.0) * dt
+
 		th_1 = th[i] + Y[i] * dt
-		Y_1 = Y[i] - (g / L * th[i] + d * Y[i]) * dt + disturbance(t[i], 1.0) * dt
+		Y_1 = Y[i] - (g / L * th[i] + d * Y[i]) * dt + dist
 		th_2 = th[i] + (Y_1 + Y[i]) * dt / 2
-		Y_2 = Y[i] - (g / L * (th_1 + th[i]) + d * (Y_1 + Y[i])) * dt / 2 + disturbance(t[i], 1.0) * dt
+		Y_2 = Y[i] - (g / L * (th_1 + th[i]) + d * (Y_1 + Y[i])) * dt / 2 + dist
 
 		y = trim(th[i], precision)
 
 		th_h_1 = th_h[i] + (Y_h[i] + k * (y - th_h[i])) * dt
-		Y_h_1 = Y_h[i] - (g / L * th_h[i] + d * Y_h[i]) * dt
+		Y_h_1 = Y_h[i] - (g / L * th_h[i] + d * Y_h[i]) * dt + dist
 		th_h_2 = th_h[i] + (Y_h[i] + k * (y - th_h[i]) + Y_h_1 + k * (y - th_h_1)) * dt / 2
-		Y_h_2 = Y_h[i] - (g / L * th_h[i] + d * Y_h[i] + g / L * th_h_1 + d * Y_h_1) * dt / 2
+		Y_h_2 = Y_h[i] - (g / L * th_h[i] + d * Y_h[i] + g / L * th_h_1 + d * Y_h_1) * dt / 2 + dist
 
 		th.append(th_2)
 		Y.append(Y_2)

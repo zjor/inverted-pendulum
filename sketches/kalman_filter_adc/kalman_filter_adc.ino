@@ -47,11 +47,11 @@ void loop() {
 
       float observedY = (y - lastTh) / dt;
                   
-      float dTh = Y + k * (y - th);
-      float dY = - g / L * th;
-      
-      Y = Y + dY * dt;
-      th = th + dTh * dt;
+      float th_1 = th + (Y + k * (y - th)) * dt;
+      float Y_1 = Y - (g / L * th) * dt;
+
+      th = th + (Y + k * (y - th) + Y_1 + k * (y - th_1)) * dt / 2;
+      Y = Y - (g / L * (th + th_1)) * dt / 2;
 
       lastTh = y;
       timestamp = now;
