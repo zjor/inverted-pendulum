@@ -1,15 +1,15 @@
 '''
 Dynamics:
-	th'' = - g / L * sin(th)
+	th'' = - g / L * sin(th) - d * th', where d - rotation friction coefficient
 
 Linearisation:
 	th' = Y
-	Y' = - g / L * th
+	Y' = - g / L * th - d * Y
 
 Estimation:
-	x_h' = A * x_h + K * (y - y_h)
 	y = trim(th)
-	y_h = th_h
+	x_h' = A * x_h + K * (y - Y_h)	
+	Y_h = - g / L * th_h - d * Y_h
 '''
 
 import numpy as np
@@ -28,6 +28,7 @@ def trim(x, step):
 # physical constants
 g = 9.8
 L = 1.0
+d = 0.05	# friction coefficient [1/sec]
 
 # simulation time
 dt = 0.05
@@ -64,36 +65,49 @@ def derivatives(state, t):
 	_Y_h = state[3]
 
 	ds[0] = state[1]
-	ds[1] = - g / L * _th + disturbance(t, 1.0)
+	ds[1] = - g / L * _th  - d * _Y + disturbance(t, 1.0)
 
 	y = trim(_th, precision)
 
 	ds[2] = _Y_h + k * (y - _th_h)
-	ds[3] = - g / L * _th_h
+	ds[3] = - g / L * _th_h - d * _Y_h
 
 	return ds
 
-solution = integrate.odeint(derivatives, state, t)
-th = solution[:, 0]
-Y = solution[:, 1]
-th_h = solution[:, 2]
-Y_h = solution[:, 3]
+def solve_odeint(derivatives, state, t):
+	solution = integrate.odeint(derivatives, state, t)	
+	th = solution[:, 0]
+	Y = solution[:, 1]
+	th_h = solution[:, 2]
+	Y_h = solution[:, 3]
+	return (th, Y, th_h, Y_h)
 
-# for i in range(len(t) - 1):
-# 	dth = Y[i]
-# 	dY = - g / L * th[i] + disturbance(t[i], 1.0)
+def solve_manual(state, t, k):
+	th = [state[0]]
+	Y = [state[1]]
+	th_h = [state[2]]
+	Y_h = [state[3]]
+	for i in range(len(t) - 1):
+		th_1 = th[i] + Y[i] * dt
+		Y_1 = Y[i] - (g / L * th[i] + d * Y[i]) * dt + disturbance(t[i], 1.0) * dt
+		th_2 = th[i] + (Y_1 + Y[i]) * dt / 2
+		Y_2 = Y[i] - (g / L * (th_1 + th[i]) + d * (Y_1 + Y[i])) * dt / 2 + disturbance(t[i], 1.0) * dt
 
-# 	_th = th[i] + dth * dt
-# 	_Y = Y[i] + dY * dt
+		y = trim(th[i], precision)
 
-# 	y = trim(_th, precision)
-# 	dth_h = Y_h[i] + k * (y - th_h[i])
-# 	dY_h = - g / L * th_h[i]
+		th_h_1 = th_h[i] + (Y_h[i] + k * (y - th_h[i])) * dt
+		Y_h_1 = Y_h[i] - (g / L * th_h[i] + d * Y_h[i]) * dt
+		th_h_2 = th_h[i] + (Y_h[i] + k * (y - th_h[i]) + Y_h_1 + k * (y - th_h_1)) * dt / 2
+		Y_h_2 = Y_h[i] - (g / L * th_h[i] + d * Y_h[i] + g / L * th_h_1 + d * Y_h_1) * dt / 2
 
-# 	th.append(_th)
-# 	Y.append(_Y)
-# 	th_h.append(th_h[i] + dth_h * dt)
-# 	Y_h.append(Y_h[i] + dY_h * dt)
+		th.append(th_2)
+		Y.append(Y_2)
+		th_h.append(th_h_2)
+		Y_h.append(Y_h_2)
+	return (th, Y, th_h, Y_h)
+
+# th, Y, th_h, Y_h = solve_odeint(derivatives, state, t)
+th, Y, th_h, Y_h = solve_manual(state, t, 10.0)
 
 th_label, = pp.plot(t, th, label='Theta')
 dth_label, = pp.plot(t, Y, label='dTheta')
