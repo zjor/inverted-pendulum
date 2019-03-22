@@ -21,8 +21,12 @@ import scipy.integrate as integrate
 import matplotlib.animation as animation
 from matplotlib.patches import Rectangle
 
-from math import pi
+from math import pi, trunc
 from numpy import sin, cos
+
+def trim(x, step):
+    d = trunc(x / step)
+    return step * d
 
 # physical constants
 g = 9.8
@@ -41,12 +45,15 @@ x = .0		# cart position
 x0 = 0		# desired cart position
 Z = .0		# cart velocity
 
+precision = 0.06
+k = 1000.0	# Kalman filter coefficient
+
 Kp_th = 50
 Kd_th = 15
 Kp_x = 3.1
 Kd_x = 4.8
 
-state = np.array([th, Y, x, Z])
+state = np.array([th, Y, x, Z, trim(th, precision), .0])
 
 def step(t):
 	if t < 5:
@@ -65,15 +72,22 @@ def derivatives(state, t):
 	_Y = state[1]
 	_x = state[2]
 	_Z = state[3]
+	_th_h = state[4]
+	_Y_h = state[5]
 
 	x0 = step(t)
 
-	u = Kp_th * _th + Kd_th * _Y + Kp_x * (_x - x0) + Kd_x * _Z
+	y = trim(_th, precision)
+
+	u = Kp_th * _th_h + Kd_th * _Y_h + Kp_x * (_x - x0) + Kd_x * _Z
 
 	ds[0] = state[1]
 	ds[1] = (g * sin(_th) - u * cos(_th)) / L
 	ds[2] = state[3]
 	ds[3] = u
+
+	ds[4] = _Y_h + k * (y - _th_h)
+	ds[5] = (g * _th_h - u) / L
 
 	return ds
 

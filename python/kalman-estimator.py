@@ -109,8 +109,8 @@ def solve_manual(state, t, k):
 		Y_h.append(Y_h_2)
 	return (th, Y, th_h, Y_h)
 
-# th, Y, th_h, Y_h = solve_odeint(derivatives, state, t)
-th, Y, th_h, Y_h = solve_manual(state, t, 10.0)
+th, Y, th_h, Y_h = solve_odeint(derivatives, state, t)
+# th, Y, th_h, Y_h = solve_manual(state, t, 10.0)
 
 th_label, = pp.plot(t, th, label='Theta')
 dth_label, = pp.plot(t, Y, label='dTheta')
