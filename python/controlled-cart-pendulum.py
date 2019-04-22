@@ -45,7 +45,7 @@ x = .0		# cart position
 x0 = 0		# desired cart position
 Z = .0		# cart velocity
 
-precision = 0.06
+precision = 0.006
 k = 1000.0	# Kalman filter coefficient
 
 Kp_th = 50
