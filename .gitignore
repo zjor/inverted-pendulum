@@ -22,3 +22,5 @@ gradlew
 gradlew.bat
 build
 out
+
+*.pyc

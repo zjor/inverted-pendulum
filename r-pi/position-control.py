@@ -1,4 +1,5 @@
 import time
+import random
 import threading
 import platform
 from stepper import Stepper
@@ -16,6 +17,8 @@ class World:
         self.x = x
         self.target_x = target_x
         self.v = v
+        self.last_v = v
+        self.last_a = .0
         self.lock = lock
         self.pulse_width = pulse_width
         self.step_delay = 0
@@ -26,7 +29,7 @@ class World:
 
 
     def get_step_delay(self, v):
-        if abs(v) < 0.0000001:
+        if abs(v) < 0.000001:
             return 0
         else:
             return 1.0 / (STEPS_PER_10CM * abs(v)) - self.pulse_width / MICROSECONDS
@@ -35,14 +38,20 @@ class World:
     def evolve(self, observed_x, dt):
         with self.lock:
             a = self.get_control(observed_x, self.target_x, self.v)
-            self.v += a * dt
-            self.x += self.v * dt
+            self.v += (a + self.last_a) * dt / 2
+            self.x += (self.v + self.last_v) * dt / 2
             self.step_delay = self.get_step_delay(self.v)
+            self.last_a = a
+            self.last_v = self.v
 
 
     def get_state(self):
         with self.lock:
             return (self.x, self.v)
+
+    def set_target(self, target):
+        with self.lock:
+            self.target_x = target
 
 
 def run_motor(stepper, world, stopped):
@@ -55,7 +64,7 @@ def run_motor(stepper, world, stopped):
         if step_delay > 0 and now - last_step_time >= step_delay:
             stepper.step(Stepper.CW if v > 0 else Stepper.CCW)
             last_step_time = now
-        time.sleep(step_delay / 7)
+        time.sleep(stepper.pulse_width)
 
 
 def update_world(world, stepper, update_timeout, stopped):
@@ -69,6 +78,14 @@ def update_world(world, stepper, update_timeout, stopped):
         time.sleep(update_timeout / 7)
 
 
+def hopper(world, delay, stopped):
+    while not stopped.isSet():
+        target = random.uniform(-0.05, 0.05)
+        print("New target set to: %f", target)
+        world.set_target(target)
+        time.sleep(delay)
+
+
 if __name__ == "__main__":
     lock = threading.Lock()
 
@@ -77,12 +94,14 @@ if __name__ == "__main__":
     stopped = threading.Event()
 
     motor_thread = threading.Thread(name='motor', target=run_motor, args=(stepper, world, stopped))
-    world_thread = threading.Thread(name='world', target=update_world, args=(world, stepper, 0.005, stopped))
+    world_thread = threading.Thread(name='world', target=update_world, args=(world, stepper, 0.001, stopped))
+    hopper_thread = threading.Thread(name='hopper', target=hopper, args=(world, 5.0, stopped))
 
     print("Press CTRL+C to interrupt")
     try:
         motor_thread.start()
         world_thread.start()
+        hopper_thread.start()
 
         while True:
             state = world.get_state()
