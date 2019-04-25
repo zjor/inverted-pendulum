@@ -1,8 +1,13 @@
 import time
 import platform
 
+from math import pi
+
 def is_raspberry():
     return platform.system() != 'Darwin'
+
+def normalize_angle(value):
+    return ((value - 10740.0) / 12000.0) * pi
 
 if is_raspberry():
     import Adafruit_ADS1x15    
@@ -14,25 +19,24 @@ if is_raspberry():
 
 
         def read(self):
-            return adc.read_adc(0, gain=2/3)
+            return normalize_angle(self.adc.read_adc(0, gain=2/3))
 
 
         def get_state(self, dt):
             current = self.read()            
             if dt == 0 or not self.last_read:
-                state = (current, None)
+                state = (current, .0)
             else:
                 state = (current, (current - self.last_read) / dt)
             self.last_read = current
             return state
 
 else:
-    from math import pi
     import random
     class Encoder:
 
         def __init__(self):            
-            self.last_read = 0
+            self.last_read = None
 
 
         def read(self):
@@ -40,8 +44,8 @@ else:
 
         def get_state(self, dt):
             current = self.read()   
-            if dt == 0:
-                state = (current, None)
+            if dt == 0 or not self.last_read:
+                state = (current, .0)
             else:
                 state = (current, (current - self.last_read) / dt)
             self.last_read = current
@@ -58,10 +62,10 @@ if __name__ == "__main__":
         while 1:
             now = time.time()
             dt = now - last_update
-            if dt > 0.001:
+            if dt >= 0.001:
                 state = enc.get_state(dt)
                 print("%f\t%f\t%f" % (now, state[0], state[1]))
                 last_update = now
-            time.sleep(0.1)
+            time.sleep(0.01)
     except KeyboardInterrupt:
         pass
