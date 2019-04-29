@@ -9,9 +9,25 @@ def is_raspberry():
 def normalize_angle(value):
     return ((value - 10740.0) / 12000.0) * pi
 
+class BaseEncoder:
+    
+    def read():
+        raise NotImplementedError
+
+
+    def get_state(self, dt):
+        current = self.read()            
+        if dt == 0 or not self.last_read:
+            state = (current, .0)
+        else:
+            state = (current, (current - self.last_read) / dt)
+        self.last_read = current
+        return state
+
+
 if is_raspberry():
     import Adafruit_ADS1x15    
-    class Encoder:
+    class Encoder(BaseEncoder):
 
         def __init__(self):
             self.adc = Adafruit_ADS1x15.ADS1115()
@@ -21,35 +37,16 @@ if is_raspberry():
         def read(self):
             return normalize_angle(self.adc.read_adc(0, gain=2/3))
 
-
-        def get_state(self, dt):
-            current = self.read()            
-            if dt == 0 or not self.last_read:
-                state = (current, .0)
-            else:
-                state = (current, (current - self.last_read) / dt)
-            self.last_read = current
-            return state
-
 else:
     import random
-    class Encoder:
+    class Encoder(BaseEncoder):
 
         def __init__(self):            
             self.last_read = None
 
 
         def read(self):
-            return random.uniform(-pi, pi)
-
-        def get_state(self, dt):
-            current = self.read()   
-            if dt == 0 or not self.last_read:
-                state = (current, .0)
-            else:
-                state = (current, (current - self.last_read) / dt)
-            self.last_read = current
-            return state            
+            return random.uniform(-pi, pi)        
 
 
 if __name__ == "__main__":    
