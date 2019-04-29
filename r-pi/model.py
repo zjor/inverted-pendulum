@@ -1,5 +1,6 @@
 import time
 import threading
+import numpy as np
 
 from math import pi
 from numpy import sin, cos
@@ -74,19 +75,29 @@ def pendulum_update(pendulum, cart, freq_kHz, stoppped):
         time.sleep(dt)
 
 
-pKp = 50.0
-pKd = 15.0
-cKp = 3.0
-cKd = 4.0
+pKp = 30.0
+pKd = 10.0
+cKp = 2.0
+cKd = 3.0
+
+
+def truncate(value, precision):
+    return precision * int(value / precision)
 
 
 def control_cart(pendulum, cart, freq_kHz, stoppped):
     dt = 1.0 / (freq_kHz * 1000)
+    last_theta = 0
     while not stoppped.isSet():
         c_state = cart.get_state()
         p_state = pendulum.get_state()
-        u = (pKp * p_state[0] + pKd * p_state[1] + cKp * c_state[0] + cKd * c_state[1])
-        cart.set_control(u)
+        
+        observed_th = truncate(p_state[0], 0.006) + np.random.normal(.0, 0.006, 1)[0]
+        observer_w = (observed_th - last_theta) / dt
+        last_theta = observed_th
+
+        u = (pKp * observed_th + pKd * observer_w + cKp * c_state[0] + cKd * c_state[1])        
+        cart.set_control(u)        
         time.sleep(dt)
 
 
@@ -97,35 +108,35 @@ def logger(pendulum, cart, freq_kHz, stoppped):
         c_state = cart.get_state()
         p_state = pendulum.get_state()
 
-        # x, v, th, w
+        # t, x, v, th, w
         print "%f\t%f\t%f\t%f\t%f" % (now, c_state[0], c_state[1], p_state[0], p_state[1])
         time.sleep(dt)
 
 
 
-if __name__ == "__main__":
-    import numpy as np
+if __name__ == "__main__":    
     import matplotlib.pyplot as pp
     import matplotlib.animation as animation
 
     dt = 0.01
 
     cart = Cart()
-    pendulum = Pendulum(1.0, .03, .0, cart)
+    pendulum = Pendulum(1.0, pi/12, .0, cart)
     
 
     stopped = threading.Event()
     pendulum_thread = threading.Thread(name="pendulum", target=pendulum_update, args=(pendulum, cart, 2, stopped))
+    # 100 Hz, cycle: 10ms
     control_thread = threading.Thread(name="control", target=control_cart, args=(pendulum, cart, 0.1, stopped))
-    logger_thread = threading.Thread(name="logger", target=logger, args=(pendulum, cart, 0.01, stopped))
+    logger_thread = threading.Thread(name="logger", target=logger, args=(pendulum, cart, 0.024, stopped))
 
     pendulum_thread.start()
     control_thread.start()
     logger_thread.start()
 
-    try:
-        while True:
-            time.sleep(0.5)
+    try:        
+        while True:            
+            time.sleep(0.5)            
     except KeyboardInterrupt:
         stopped.set()
         

@@ -10,7 +10,7 @@ from numpy import sin, cos
 
 def animate_cart(cart_x, thetas, L, dt):
 
-    pxs = L * sin(thetas)
+    pxs = L * sin(thetas) + cart_x
     pys = L * cos(thetas)
 
 
