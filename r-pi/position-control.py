@@ -47,7 +47,7 @@ class World:
 
     def get_state(self):
         with self.lock:
-            return (self.x, self.v)
+            return (self.x, self.v, self.last_a)
 
     def set_target(self, target):
         with self.lock:
@@ -95,20 +95,20 @@ if __name__ == "__main__":
 
     motor_thread = threading.Thread(name='motor', target=run_motor, args=(stepper, world, stopped))
     world_thread = threading.Thread(name='world', target=update_world, args=(world, stepper, 0.001, stopped))
-    hopper_thread = threading.Thread(name='hopper', target=hopper, args=(world, 5.0, stopped))
+    # hopper_thread = threading.Thread(name='hopper', target=hopper, args=(world, 5.0, stopped))
 
-    print("Press CTRL+C to interrupt")
     try:
         motor_thread.start()
         world_thread.start()
-        hopper_thread.start()
+        # hopper_thread.start()
 
         while True:
             state = world.get_state()
             position = stepper.get_position()
+            now = time.time()
 
-            print("V = %f;\tEstimated X = %f;\tReal X = %f" % (state[1], state[0], float(position) / STEPS_PER_10CM))
-            time.sleep(0.1)
+            print("%f\t%f\t%f\t%f\t%f" % (now, state[2], state[1], state[0], float(position) / STEPS_PER_10CM))
+            time.sleep(0.005)
 
     except KeyboardInterrupt:
         stopped.set()
