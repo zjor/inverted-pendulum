@@ -1,5 +1,5 @@
 """
-    Controlling cart position with DC motor and LQR
+    Controlling cart position with DC motor and PID
     Assumptions:
         - no friction
         - L / R << J / B
@@ -14,15 +14,7 @@
 import numpy as np
 import matplotlib.pyplot as pp
 
-from lqr_solver import lqr, dlqr
-
-def limit_control(u, limit):
-    if u < -limit:
-        return -limit
-    elif u > limit:
-        return limit
-    else:
-        return u
+from control_position_lqr import limit_control
 
 # motor constants
 L = 0.1
@@ -34,48 +26,34 @@ U = 12.0
 m = 10.0
 r = 0.005
 
+Kp = 100.0
+Kd = 5.0
+Ki = 0.1
+
 a = -(B + k * k / R) / (J + m * r * r)
 b = k / ((J + m * r * r) * R)
 
-A = np.matrix([    
-    [a, .0],
-    [r, .0]
-])
+dt = 0.005
+t = np.arange(0.0, 20.0, dt)
+x = np.zeros(len(t))
+w = np.zeros(len(t))
+control = np.zeros(len(t))
 
-B = np.matrix([
-    [b],
-    [0.0]
-    ])
-
-Q = np.matrix([
-    [0.01, 0.0],
-    [0.0, 1000.0]
-])
-
-R = np.matrix([0.1])
+x[0] = 0.1
+last_error = None
+error_integral = 0.0
 
 if __name__ == "__main__":
-
-    K, X, eig = lqr(A, B, Q, R)
-
-    print("K:")
-    print(K)
-    print("X:")
-    print(X)
-    print("Eigen vectors:")
-    print(eig)
-
-    dt = 0.005
-    t = np.arange(0.0, 30.0, dt)
-    x = np.zeros(len(t))
-    w = np.zeros(len(t))
-    control = np.zeros(len(t))
-
-    x[0] = 0.1
-
     for i in range(0, len(t) - 1):
-        u = - limit_control(K[0,0] * w[i] + K[0,1] * x[i], 12)
+        error = x[i]
+        if last_error == None:
+            last_error = x[i]
+        u = - limit_control(Kp * error + Kd * (error - last_error) / dt + Ki * error_integral, 12)
+        last_error = error
+        error_integral += error * dt
+        
         control[i] = u
+
         dx = w[i] * r
         dw = a * w[i] + b * u
 
