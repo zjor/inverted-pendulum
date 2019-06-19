@@ -65,3 +65,8 @@ Controllability matrix
 
 ## LQR controller
 ![LQR results](lqr.png)
+
+## TODO
+
+- find alpha, beta parameters for the real motor based in step response
+- take into account load friction and stall torque
