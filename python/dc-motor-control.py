@@ -11,6 +11,7 @@ import numpy as np
 
 import matplotlib
 matplotlib.use('TKAgg')
+
 import matplotlib.pyplot as pp
 import scipy.integrate as integrate
 import matplotlib.animation as animation
@@ -21,44 +22,56 @@ from numpy import sin, cos
 
 # physical constants
 g = 9.8
-l = 0.8
+l = 1.0
 m_p = 0.5
-m_k = 0.2
+m_k = 1.0
+m_r = 0.001 # mass of the broom
 k = 0.5 # motor torque constant
-I = 0.1 # rotational inertia
-R = 0.5 # motor resistance
-r = 0.5   # shaft radius
-
-# simulation time
-dt = 0.05
-Tmax = 20
-t = np.arange(0.0, Tmax, dt)
-
-# initial conditions
-x1_0 = 0.3  # x - cart position
-x2_0 = 0.0 # v - cart velocity
-x3_0 = pi/6 # theta - pendulum angle
-x4_0 = 0.0  # angular velocity
-
-state = np.array([x1_0, x2_0, x3_0, x4_0])
+I = m_r * l * l / 12 # rotational inertia of a rod (m_r * l * l / 12)
+R = 6.5 # motor resistance
+r = 0.05   # shaft radius
 
 M = m_k + m_p
 L = (I + m_p * l * l) / (m_p * l)
 
+# simulation time
+dt = 0.01
+Tmax = 10
+t = np.arange(0.0, Tmax, dt)
+
+# initial conditions
+x1_0 = 0.0  # x - cart position
+x2_0 = 0.0 # v - cart velocity
+x3_0 = pi/12 # theta - pendulum angle
+x4_0 = 0.0  # angular velocity
+
+state = np.array([x1_0, x2_0, x3_0, x4_0])
+
 # control matrix
-K = [.0, .0, -0.06, -0.03]
+K = [-5.4772255750531889, -23.938795926902721, -93.42203852466433, -28.650581504633493]
+
+def disturbance(t):
+    if t > 1.0 and t < 1.2:
+        return -10.0
+    else:
+        return 0.0
 
 def derivatives(state, t):
     ds = np.zeros_like(state)
 
-    _x1, _x2, _x3, _x4 = state
+    x, dx, th, dth = state
 
-    u = np.dot(K, state)
+    u = -np.dot(K, state)
+    # u = 0.0
 
-    ds[0] = _x2
-    ds[1] = (k / (R * r) * u - k * k / (R * r * r) * _x2 - m_p * l * g * cos(_x3) * sin(_x3) + m_p * l * _x4 * _x4 * sin(_x3)) / (M - m_p * l * cos(_x3) * cos(_x3) / L)
-    ds[2] = _x4
-    ds[3] = (cos(_x3) / M * (k * k / (R * r * r) * _x2 - k / (R * r) * u) + g * sin(_x3) - m_p * l * _x4 * _x4 * cos(_x3) * sin(_x3) / M) / (L - m_p*l*cos(_x3) * cos(_x3) / M)
+    F = k * u / (R * r) - k * k / (R * r * r) * dx
+    # F = 0
+
+    ds[0] = dx
+    ds[1] = (F - m_p * l * g * cos(th) * sin(th) / L + m_p * l * dth * dth * sin(th)) / (M - m_p * l * cos(th) * cos(th) / L)
+    ds[2] = dth
+    ds[3] = (- cos(th) / M * F + g * sin(th) - m_p * l * dth * dth * cos(th) * sin(th) / M) / (L - m_p * l * cos(th) * cos(th) / M)
+    ds[3] = ds[3] + disturbance(t)
 
     return ds
 

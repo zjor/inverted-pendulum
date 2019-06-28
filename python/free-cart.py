@@ -25,6 +25,10 @@ References:
 """
 
 import numpy as np
+
+import matplotlib
+matplotlib.use('TKAgg')
+
 import matplotlib.pyplot as pp
 import scipy.integrate as integrate
 import matplotlib.animation as animation
