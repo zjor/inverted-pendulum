@@ -1,6 +1,6 @@
 /**
- * This is a model problem of using feedback control to bring a cart to (x:0, v:0) with stepper motor.
- * PD regulator is used.
+ * Inverted pendulum problem with state controller
+ * Encoder: OMRON E6B2-CWZ6C
  * Stepper driver: DQ542MA
  * 
  */ 
@@ -8,8 +8,13 @@
 #include <float.h>
 #include <limits.h>
 
-#define STEP_PIN  4
-#define DIR_PIN   3
+// encoder pins
+#define OUTPUT_A  2
+#define OUTPUT_B  3
+
+// stepper pins
+#define STEP_PIN  6
+#define DIR_PIN   5
 
 #define PULSE_WIDTH             4
 #define MIN_STEP_DELAY_uS       400
@@ -57,14 +62,21 @@ unsigned long lastUpdateTime = 0;
 
 boolean interrupted = false;
 
+volatile int encoderValue = 0;
+
 void setup() {
   Serial.begin(115200);
+
+  pinMode(OUTPUT_A, INPUT_PULLUP);
+  pinMode(OUTPUT_B, INPUT_PULLUP);
 
   pinMode(STEP_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
 
   digitalWrite(STEP_PIN, LOW);
   digitalWrite(DIR_PIN, LOW);
+
+  attachInterrupt(digitalPinToInterrupt(OUTPUT_A), aHandler, CHANGE);
   
   lastStepTime = lastUpdateTime = micros();
 }
@@ -79,6 +91,9 @@ void loop() {
     return;
   }
 
+  Serial.println(encoderValue);
+  delay(50);
+
 //  for (int i = 0; i < P0; i++) {
 //    step(LOW);
 //    delayMicroseconds(662);
@@ -87,16 +102,16 @@ void loop() {
 //  interrupted = true;
 //  Serial.println(evolutionPeriodMicros);
   
-  unsigned long now = micros();
-  if (now - lastUpdateTime >= evolutionPeriodMicros) {
-    float dt = 1.0 * (now - lastUpdateTime) / uS;
-    integrate(dt);
-    lastUpdateTime = now;
-  }
-
-  if (!isZeroVelocity(v)) {
-    runMotor();
-  }
+//  unsigned long now = micros();
+//  if (now - lastUpdateTime >= evolutionPeriodMicros) {
+//    float dt = 1.0 * (now - lastUpdateTime) / uS;
+//    integrate(dt);
+//    lastUpdateTime = now;
+//  }
+//
+//  if (!isZeroVelocity(v)) {
+//    runMotor();
+//  }
 
 //  logState();
   
@@ -172,4 +187,15 @@ void step(int dir) {
   digitalWrite(STEP_PIN, LOW);
   
   position += (dir == HIGH) ? 1: -1;
+}
+
+void aHandler() {
+  int _a = digitalRead(OUTPUT_A);
+  int _b = digitalRead(OUTPUT_B);
+  
+  if (_a == _b) {
+    encoderValue++; //CW
+  } else {
+    encoderValue--; //CCW
+  }
 }
