@@ -12,6 +12,8 @@
 #define OUTPUT_A  2
 #define OUTPUT_B  3
 
+#define HALF_TURN_PULSES_COUNT  5000
+
 // stepper pins
 #define STEP_PIN  6
 #define DIR_PIN   5
@@ -63,6 +65,7 @@ unsigned long lastUpdateTime = 0;
 boolean interrupted = false;
 
 volatile int encoderValue = 0;
+volatile int lastEncoded = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -76,7 +79,8 @@ void setup() {
   digitalWrite(STEP_PIN, LOW);
   digitalWrite(DIR_PIN, LOW);
 
-  attachInterrupt(digitalPinToInterrupt(OUTPUT_A), aHandler, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(OUTPUT_A), encoderHandler, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(OUTPUT_B), encoderHandler, CHANGE);
   
   lastStepTime = lastUpdateTime = micros();
 }
@@ -91,7 +95,7 @@ void loop() {
     return;
   }
 
-  Serial.println(encoderValue);
+  Serial.println(getAngle(encoderValue));
   delay(50);
 
 //  for (int i = 0; i < P0; i++) {
@@ -189,13 +193,27 @@ void step(int dir) {
   position += (dir == HIGH) ? 1: -1;
 }
 
-void aHandler() {
-  int _a = digitalRead(OUTPUT_A);
-  int _b = digitalRead(OUTPUT_B);
-  
-  if (_a == _b) {
+void encoderHandler() {
+  int MSB = digitalRead(OUTPUT_A); //MSB = most significant bit
+  int LSB = digitalRead(OUTPUT_B); //LSB = least significant bit
+
+  int encoded = (MSB << 1) | LSB; //converting the 2 pin value to single number
+  int sum  = (lastEncoded << 2) | encoded; //adding it to the previous encoded value
+
+  if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) {
     encoderValue++; //CW
-  } else {
+  }
+  if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) {
     encoderValue--; //CCW
+  }
+
+  lastEncoded = encoded; //store this value for next time  
+}
+
+float getAngle(float pulses) {  
+  if (pulses > 0) {
+    return PI * (1.0 - pulses / HALF_TURN_PULSES_COUNT); 
+  } else {
+    return -PI * (1.0 + pulses / HALF_TURN_PULSES_COUNT);
   }
 }
