@@ -19,25 +19,31 @@
 #define DIR_PIN   5
 
 #define PULSE_WIDTH             4
-#define MIN_STEP_DELAY_uS       400
+#define MIN_STEP_DELAY_uS       350
 #define ZERO_VELOCITY_TOLERANCE 0.000001
 
-// converts step velocity to m/s
-#define VELOCITY_KOEFFICIENT    20000.0     // 1/4 step => 800 spr; 1600 steps per 8cm
-//#define VELOCITY_KOEFFICIENT    10000.0     // 1/2 step => 400 spr
+// steps per meter
+//#define VELOCITY_KOEFFICIENT    20000.0     // 1/4 step => 800 spr; 1600 steps per 8cm
+#define VELOCITY_KOEFFICIENT    10000.0     // 1/2 step => 400 spr
 
-#define POSITION_LIMIT  3200
+#define ANGLE_CTRB_LIMIT  PI/36
+
+// 17cm limit
+#define POSITION_LIMIT  VELOCITY_KOEFFICIENT  * 17 / 100
 
 // steps per revolution
-#define SPR 800
+#define SPR 400
 
 #define EVOLUTION_FREQ_HZ     100
 
-#define Kp  4
-#define Kd  0.5
+#define aKp  200.0
+#define aKd  8.5
+
+#define Kp  4.0
+#define Kd  0.05
 
 // initial displacement
-#define X0  0.08
+#define X0  0.0
 #define P0  VELOCITY_KOEFFICIENT * X0
 #define V0  0.0
 
@@ -52,6 +58,10 @@ float x = P0 / VELOCITY_KOEFFICIENT;         // calculated position
 float last_a = .0;
 float last_v = .0;
 
+float angle = PI;
+float lastAngle = .0;
+float omega = .0;
+
 int direction = HIGH;
 long position = P0;
 
@@ -63,6 +73,7 @@ unsigned long lastStepTime = 0;
 unsigned long lastUpdateTime = 0;
 
 boolean interrupted = false;
+boolean isControlling = false;
 
 volatile int encoderValue = 0;
 volatile int lastEncoded = 0;
@@ -89,66 +100,67 @@ int dir = LOW;
 
 unsigned long i = 0;
 
-void loop() {  
+void loop() {
+
+  if (!isControlling && fabs(angle) <= ANGLE_CTRB_LIMIT) {
+    isControlling = true;
+  }
 
   if (interrupted) {
     return;
   }
-
-  Serial.println(getAngle(encoderValue));
-  delay(50);
-
-//  for (int i = 0; i < P0; i++) {
-//    step(LOW);
-//    delayMicroseconds(662);
-//  }
-//
-//  interrupted = true;
-//  Serial.println(evolutionPeriodMicros);
   
-//  unsigned long now = micros();
-//  if (now - lastUpdateTime >= evolutionPeriodMicros) {
-//    float dt = 1.0 * (now - lastUpdateTime) / uS;
-//    integrate(dt);
-//    lastUpdateTime = now;
-//  }
-//
-//  if (!isZeroVelocity(v)) {
-//    runMotor();
-//  }
+  unsigned long now = micros();
+  if (now - lastUpdateTime >= evolutionPeriodMicros) {
+    float dt = 1.0 * (now - lastUpdateTime) / uS;
+    integrate(dt);
+    lastUpdateTime = now;
+  }
+
+  if (!isZeroVelocity(v)) {
+    runMotor();
+  }
 
 //  logState();
   
 }
 
 void logState() {
-  if (i % 10 == 0) {
-    Serial.print(position);
-    Serial.print("\t");
+  if (i % 200 == 0) {
+//    Serial.print(position);
+//    Serial.print("\t");
     Serial.print(x, 8);
     Serial.print("\t");
-    Serial.println(v, 8);
-//    Serial.print("\t");
-//    Serial.println(stepDelay);
+    Serial.print(v, 8);
+    Serial.print("\t");
+    Serial.print(angle, 3);
+    Serial.print("\t");
+    Serial.println(omega, 8);
   }
 
   i++;
-  if (i > 10000) {
-    interrupted = true;
+}
+
+float getControl(float th, float omega, float x, float v) {
+  if (isControlling) {
+    return - (Kp * x + Kd * v + aKp * th + aKd * omega);  
+  } else {
+    return 0.0;
+//    return - (Kp * x + Kd * v);    
   }
+  
 }
-
-float getControl(float x, float v) {
-  return - (Kp * x + Kd * v);
-}
-
 
 void integrate(float dt) {
-  a = getControl(x, v);
+  angle = getAngle(encoderValue);
+  omega = (angle - lastAngle) / dt;
+  lastAngle = angle;
+  
+  a = getControl(angle, omega, x, v);  
   v += (a + last_a) * dt / 2;
   
-  x += (v + last_v) * dt / 2;
-//  x = 1.0 * position / VELOCITY_KOEFFICIENT;
+//  x += (v + last_v) * dt / 2;
+  x = 1.0 * position / VELOCITY_KOEFFICIENT;
   
   stepDelay = getStepDelay(v);
   
