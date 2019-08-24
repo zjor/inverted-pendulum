@@ -19,7 +19,7 @@
 #define DIR_PIN   5
 
 #define PULSE_WIDTH             4
-#define MIN_STEP_DELAY_uS       350
+#define MIN_STEP_DELAY_uS       300
 #define ZERO_VELOCITY_TOLERANCE 0.000001
 
 // steps per meter
@@ -34,13 +34,13 @@
 // steps per revolution
 #define SPR 400
 
-#define EVOLUTION_FREQ_HZ     100
+#define EVOLUTION_FREQ_HZ     500
 
-#define aKp  200.0
-#define aKd  8.5
+#define aKp  100.0
+#define aKd  10.0
 
-#define Kp  4.0
-#define Kd  0.05
+#define Kp  0.0
+#define Kd  1.0
 
 // initial displacement
 #define X0  0.0
@@ -129,10 +129,10 @@ void logState() {
   if (i % 200 == 0) {
 //    Serial.print(position);
 //    Serial.print("\t");
-    Serial.print(x, 8);
-    Serial.print("\t");
-    Serial.print(v, 8);
-    Serial.print("\t");
+//    Serial.print(x, 8);
+//    Serial.print("\t");
+//    Serial.print(v, 8);
+//    Serial.print("\t");
     Serial.print(angle, 3);
     Serial.print("\t");
     Serial.println(omega, 8);
