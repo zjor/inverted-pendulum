@@ -9,5 +9,9 @@ This code controls position of a cart with a stepper motor. Timer interrupt is u
 
 ## Thoughts
 
-Usage of interrupts allows loggin system's state to console.
+Usage of interrupts allows logging system's state to console.
 The problem arises when the motor should be driven very slowly, velocity update happens each step, e.i. each ISR call and if there is enough time between calls the system will evolve before the change is recognised and reflected in motion.
+
+## References
+- (http://maxembedded.com/2011/07/avr-timers-ctc-mode/)
+- (https://www.instructables.com/id/Arduino-Timer-Interrupts/)
