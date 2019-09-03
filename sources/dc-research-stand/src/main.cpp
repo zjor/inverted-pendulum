@@ -5,6 +5,12 @@
  * - White - Phase B
  * - Orange - Phaze Z
  * - Blue - GND
+ *
+ * LPD3806-600BM-G5-24C pinout
+ * - Green - Phase A
+ * - White - Phase B
+ * - Red - Vcc
+ * - Black - GND
  */
 
 #include <Arduino.h>
@@ -14,7 +20,7 @@
 #define OUTPUT_B  3
 
 // pulses per revolution
-#define PPR  10000
+#define PPR  2400
 
 #define PWM_PIN 5
 #define DIR_PIN 4
@@ -49,35 +55,24 @@ void setup() {
   lastTimeMillis = millis();
 }
 
-float v_avg[20];
-long ix = 0;
-
 void loop() {
   unsigned long now = millis();
-  if (now > initialDelay) {
-    u = amp;
-    analogWrite(PWM_PIN, fabs(u));
-  }
+
+  u = amp * sin(w * now / 1000);
+  digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
+  analogWrite(PWM_PIN, fabs(u));  
 
   float dt = 1.0 * (now - lastTimeMillis) / 1000.0;
   float v = 1.0 * (encoderValue - lastEncoderValue) / dt / PPR;
 
-  v_avg[ix % 20] = v;
-  ix++;
-  if (ix % 20 == 0) {
-    float sum = .0;
-    for (int i = 0; i < 20; i++) {
-      sum += v_avg[i];
-    }
-    Serial.print(u);
-    Serial.print("\t");  
-    Serial.println(sum / 20);
-  }
+  Serial.print(u);
+  Serial.print("\t");
+  Serial.println(v, 4);
 
   lastTimeMillis = now;
   lastEncoderValue = encoderValue;
 
-  delay(50);
+  delay(25);
 }
 
 void encoderHandler() {
