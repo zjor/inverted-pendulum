@@ -26,9 +26,9 @@ U = 12.0
 m = 10.0
 r = 0.005
 
-Kp = 100.0
-Kd = 10.0
-Ki = 10.0
+Kp = 10.0
+Kd = 0.0
+Ki = 3.0
 
 a = -(B + k * k / R) / (J + m * r * r)
 b = k / ((J + m * r * r) * R)
@@ -39,15 +39,15 @@ x = np.zeros(len(t))
 w = np.zeros(len(t))
 control = np.zeros(len(t))
 
-x[0] = 0.1
+w_ref = 1.0
 last_error = None
 error_integral = 0.0
 
 if __name__ == "__main__":
     for i in range(0, len(t) - 1):
-        error = x[i]
+        error = w[i] - w_ref
         if last_error == None:
-            last_error = x[i]
+            last_error = w[i]
         u = - limit_control(Kp * error + Kd * (error - last_error) / dt + Ki * error_integral, 12)
         last_error = error
         error_integral += error * dt
