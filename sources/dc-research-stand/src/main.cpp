@@ -25,11 +25,19 @@
 #define PWM_PIN 5
 #define DIR_PIN 4
 
+#define MAX_STALL_U 7.0
+
+#define Kp  3.0
+#define Kd  0.0
+#define Ki  1.0
+
 volatile long encoderValue = 0;
 volatile long lastEncoded = 0;
 long lastEncoderValue = 0;
 
 unsigned long lastTimeMillis = 0;
+
+unsigned long lastVelocityChange = 0;
 
 const long initialDelay = 2000;
 
@@ -52,27 +60,76 @@ void setup() {
   digitalWrite(DIR_PIN, LOW);
 
   Serial.begin(9600);
-  lastTimeMillis = millis();
+  lastTimeMillis = 0L;
+  lastVelocityChange = millis();
+}
+
+float v = 0.0;
+float dt = 0.0;
+float error = 0.0;
+float last_error = 0.0;
+float integral_error = 0.0;
+float target_v = 4.5;
+
+void setRandomTargetVelocity(unsigned long now) {
+  if (now - lastVelocityChange >= 3000) {
+    target_v = random(3, 6);
+    lastVelocityChange = now;
+  }
+}
+
+float avoidStall(float u) {
+  if (fabs(u) < MAX_STALL_U) {
+    return u > 0 ? MAX_STALL_U : -MAX_STALL_U;
+  }
+  return u;
+}
+
+float getSineControl(unsigned long now) {
+  return amp * sin(w * now / 1000);
+}
+
+float getVelocityControl(float v, float dt) {
+  if (v != v) {
+    // v is nan
+    return 0.0;
+  }
+
+  error = v - target_v;
+  float de = (error - last_error) / dt;
+  integral_error += error * dt;
+  last_error = error;
+  return - (Kp * error + Kd * de + Ki * integral_error);
 }
 
 void loop() {
-  unsigned long now = millis();
 
-  u = amp * sin(w * now / 1000);
+  unsigned long now = millis();
+  dt = 1.0 * (now - lastTimeMillis) / 1000.0;
+  v = 1.0 * (encoderValue - lastEncoderValue) / dt / PPR;
+
+  setRandomTargetVelocity(now);
+
+  float orig_u = getVelocityControl(v, dt);
+
+  u = avoidStall(orig_u);
+
   digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
   analogWrite(PWM_PIN, fabs(u));  
 
-  float dt = 1.0 * (now - lastTimeMillis) / 1000.0;
-  float v = 1.0 * (encoderValue - lastEncoderValue) / dt / PPR;
+  Serial.print(orig_u);
+  Serial.print("\t");
 
   Serial.print(u);
+  Serial.print("\t");
+  Serial.print(target_v);
   Serial.print("\t");
   Serial.println(v, 4);
 
   lastTimeMillis = now;
   lastEncoderValue = encoderValue;
 
-  delay(25);
+  delay(10);
 }
 
 void encoderHandler() {
