@@ -48,6 +48,7 @@ float w = 2.0 * PI / 10.0;
 void encoderHandler();
 
 void setup() {
+  TCCR1B = TCCR1B & 0b11111000 | 1;  // set 31KHz PWM to prevent motor noise
   pinMode(OUTPUT_A, INPUT_PULLUP);
   pinMode(OUTPUT_B, INPUT_PULLUP);
 
@@ -131,8 +132,8 @@ void loop() {
 
   float orig_u = getPositionControl(x, dt);
 
-  u = avoidStall(orig_u);
-  // u = orig_u;
+  // u = avoidStall(orig_u);
+  u = orig_u;
 
   digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
   analogWrite(PWM_PIN, fabs(u));  
