@@ -21,23 +21,23 @@
 
 // pulses per revolution
 #define PPR  2400
+#define SHAFT_R 0.00611
 
 #define PWM_PIN 5
 #define DIR_PIN 4
 
-#define MAX_STALL_U 7.0
+#define MAX_STALL_U 8.0
 
-#define Kp  3.0
-#define Kd  0.0
-#define Ki  1.0
+#define Kp  80.0
+#define Kd  20.0
+#define Ki  30.0
 
 volatile long encoderValue = 0;
 volatile long lastEncoded = 0;
-long lastEncoderValue = 0;
 
 unsigned long lastTimeMillis = 0;
 
-unsigned long lastVelocityChange = 0;
+unsigned long lastTargetChange = 0;
 
 const long initialDelay = 2000;
 
@@ -61,20 +61,26 @@ void setup() {
 
   Serial.begin(9600);
   lastTimeMillis = 0L;
-  lastVelocityChange = millis();
+  lastTargetChange = millis();
 }
+
+
+float x = 0.0;
+float last_x = 0.0;
+float target_x = 0.5;
 
 float v = 0.0;
 float dt = 0.0;
 float error = 0.0;
 float last_error = 0.0;
 float integral_error = 0.0;
-float target_v = 4.5;
+float target_v = 0.1;
 
-void setRandomTargetVelocity(unsigned long now) {
-  if (now - lastVelocityChange >= 3000) {
-    target_v = random(3, 6);
-    lastVelocityChange = now;
+void setRandomTarget(unsigned long now) {
+  if (now - lastTargetChange >= 3000) {
+    target_v = 1.0 * random(5) / 10.0;
+    target_x = 1.0 * random(5) / 10.0;
+    lastTargetChange = now;
   }
 }
 
@@ -102,32 +108,48 @@ float getVelocityControl(float v, float dt) {
   return - (Kp * error + Kd * de + Ki * integral_error);
 }
 
+float getPositionControl(float x, float dt) {
+  if (x != x) {
+    return 0.0;
+  }
+
+  error = x - target_x;
+  float de = (error - last_error) / dt;
+  integral_error += error * dt;
+  last_error = error;
+  return - (Kp * error + Kd * de + Ki * integral_error);
+}
+
 void loop() {
 
   unsigned long now = millis();
   dt = 1.0 * (now - lastTimeMillis) / 1000.0;
-  v = 1.0 * (encoderValue - lastEncoderValue) / dt / PPR;
+  x = 2.0 * PI * encoderValue / PPR * SHAFT_R;
+  v = 1.0 * (x - last_x) / dt;
 
-  setRandomTargetVelocity(now);
+  setRandomTarget(now);
 
-  float orig_u = getVelocityControl(v, dt);
+  float orig_u = getPositionControl(x, dt);
 
   u = avoidStall(orig_u);
+  // u = orig_u;
 
   digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
   analogWrite(PWM_PIN, fabs(u));  
 
-  Serial.print(orig_u);
-  Serial.print("\t");
+  // Serial.print(orig_u);
+  // Serial.print("\t");
 
-  Serial.print(u);
+  // Serial.print(u);
+  // Serial.print("\t");
+  Serial.print(target_x * 100);
   Serial.print("\t");
-  Serial.print(target_v);
-  Serial.print("\t");
-  Serial.println(v, 4);
+  // Serial.print(v, 4);
+  // Serial.print("\t");
+  Serial.println(x * 100);
 
   lastTimeMillis = now;
-  lastEncoderValue = encoderValue;
+  last_x = x;
 
   delay(10);
 }
