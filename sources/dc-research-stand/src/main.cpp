@@ -26,11 +26,11 @@
 #define PWM_PIN 5
 #define DIR_PIN 4
 
-#define MAX_STALL_U 8.0
+#define MAX_STALL_U 5.0
 
 #define Kp  80.0
-#define Kd  20.0
-#define Ki  30.0
+#define Kd  -0.1
+#define Ki  40.0
 
 volatile long encoderValue = 0;
 volatile long lastEncoded = 0;
@@ -41,14 +41,13 @@ unsigned long lastTargetChange = 0;
 
 const long initialDelay = 2000;
 
-float amp = 25;
+float amp = 255;
 float u = 0.0;
 float w = 2.0 * PI / 10.0;
 
 void encoderHandler();
 
 void setup() {
-  TCCR1B = TCCR1B & 0b11111000 | 1;  // set 31KHz PWM to prevent motor noise
   pinMode(OUTPUT_A, INPUT_PULLUP);
   pinMode(OUTPUT_B, INPUT_PULLUP);
 
@@ -65,92 +64,80 @@ void setup() {
   lastTargetChange = millis();
 }
 
-
-float x = 0.0;
-float last_x = 0.0;
-float target_x = 0.5;
-
-float v = 0.0;
 float dt = 0.0;
 float error = 0.0;
 float last_error = 0.0;
 float integral_error = 0.0;
-float target_v = 0.1;
-
-void setRandomTarget(unsigned long now) {
-  if (now - lastTargetChange >= 3000) {
-    target_v = 1.0 * random(5) / 10.0;
-    target_x = 1.0 * random(5) / 10.0;
-    lastTargetChange = now;
-  }
-}
 
 float avoidStall(float u) {
   if (fabs(u) < MAX_STALL_U) {
-    return u > 0 ? MAX_STALL_U : -MAX_STALL_U;
+    return u > 0 ? u + MAX_STALL_U : u - MAX_STALL_U;
   }
   return u;
+}
+
+float saturate(float v, float maxValue) {
+  if (fabs(v) > maxValue) {
+    return (v > 0) ? maxValue : -maxValue;
+  } else {
+    return v;
+  }
 }
 
 float getSineControl(unsigned long now) {
   return amp * sin(w * now / 1000);
 }
 
-float getVelocityControl(float v, float dt) {
-  if (v != v) {
-    // v is nan
+float getPIDControl(float value, float target, float dt) {
+  if (value != value) {
     return 0.0;
   }
 
-  error = v - target_v;
+  error = target - value;
   float de = (error - last_error) / dt;
   integral_error += error * dt;
   last_error = error;
-  return - (Kp * error + Kd * de + Ki * integral_error);
+  return -(Kp * error + Kd * de + Ki * integral_error);
 }
 
-float getPositionControl(float x, float dt) {
-  if (x != x) {
-    return 0.0;
-  }
-
-  error = x - target_x;
-  float de = (error - last_error) / dt;
-  integral_error += error * dt;
-  last_error = error;
-  return - (Kp * error + Kd * de + Ki * integral_error);
+float getAngle(long pulses) {
+  return 2.0 * PI * encoderValue / PPR;
 }
+
+float lastAngle = .0;
+float lastW = .0;
+unsigned long lastTargetUpdate = 0;
+float setPoint = PI / 3;
 
 void loop() {
 
   unsigned long now = millis();
   dt = 1.0 * (now - lastTimeMillis) / 1000.0;
-  x = 2.0 * PI * encoderValue / PPR * SHAFT_R;
-  v = 1.0 * (x - last_x) / dt;
+  float angle = getAngle(encoderValue);
+  float w = (angle - lastAngle) / dt;
+  lastAngle = angle;
 
-  setRandomTarget(now);
+  if (now - lastTargetUpdate > 2000) {
+    setPoint += PI / 3;
+    lastTargetUpdate = now;
+  }
 
-  float orig_u = getPositionControl(x, dt);
+  float orig_u = getPIDControl(angle, setPoint, dt);
 
-  // u = avoidStall(orig_u);
-  u = orig_u;
+  u = saturate(avoidStall(orig_u), 255.0);
 
   digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
   analogWrite(PWM_PIN, fabs(u));  
 
-  // Serial.print(orig_u);
-  // Serial.print("\t");
-
-  // Serial.print(u);
-  // Serial.print("\t");
-  Serial.print(target_x * 100);
+  Serial.print(setPoint);
   Serial.print("\t");
-  // Serial.print(v, 4);
-  // Serial.print("\t");
-  Serial.println(x * 100);
+  Serial.print(u / 255);
+  Serial.print("\t");
+  Serial.print(w, 4);
+  Serial.print("\t");
+  Serial.println(angle);
 
   lastTimeMillis = now;
-  last_x = x;
 
   delay(10);
 }
