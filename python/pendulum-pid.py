@@ -1,6 +1,9 @@
-import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.pyplot as pp
 
 from math import sin, cos, pi
+
+from pidcontroller import PIDController
 
 '''
 	Equations:
@@ -10,52 +13,59 @@ from math import sin, cos, pi
 
 L = 1.0
 g = 9.8
-th = [pi / 12]
-dth = [0.0]
+th = [pi / 24]
+w = [0.0]
 f = [0.0]
 v = [0.0]
 x = [0.0]
 x0 = 0.0
 
 dt = 0.01
-N = 10000
+time = np.arange(0, 10, dt)
 
-Kp = 44.0
+Kp = 60.0
 Kd = 14.0
+Ki = 0.0
 
-xKp = 3.1
-xKd = 4.8
+xKp = 2.0
+xKd = 3.0
+xKi = 0.0
 
-for i in range(0, N):
+pid_th = PIDController(Kp, Kd, Ki, 0.0, th[0])
+pid_x = PIDController(xKp, xKd, xKi, 0.0, x[0])
 
-	f.append((Kp * th[i] + Kd * dth[i] + xKp * (x[i] - x0) + xKd * v[i]))	
+for i in range(0, len(time) - 1):
+
+	u = pid_th.getControl(th[i], dt) + pid_x.getControl(x[i], dt)
+	f.append(-u)
 
 	d2th = (g * sin(th[i]) - f[i] * cos(th[i])) / L
-	dth1 = dth[i] + d2th * dt
+	dth1 = w[i] + d2th * dt
 
 	v.append(v[i] + f[i] * dt)
 	x.append(x[i] + v[i] * dt)
 	
 	th.append(th[i] + dth1 * dt)
-	dth.append(dth1)
+	w.append(dth1)
 
-	if i == 5000:
-		x0 = 0.1
+	if i == len(time) / 2:
+		x0 = 0.2
+		pid_x.setTarget(x0)
 
-plt.figure(1)
-plt.subplot(211)
-plt.title("PD regulator")
-line_th, = plt.plot(range(0, N + 1), th, label = 'Th')
-line_dth, = plt.plot(range(0, N + 1), dth, label = 'dTh')
-line_f, = plt.plot(range(0, N + 1), f, label = 'acceleration')
+pp.figure(1)
+pp.subplot(211)
+pp.title("PD regulator")
+line_th, = pp.plot(time, th, label = 'th')
+line_dth, = pp.plot(time, w, label = 'w')
+pp.grid(True)
+pp.legend([line_th, line_dth])
 
-plt.legend([line_th, line_dth, line_f])
-
-plt.subplot(212)
-line_v, = plt.plot(range(0, N + 1), v, label = 'v')
-line_x, = plt.plot(range(0, N + 1), x, label = 'x')
-
-plt.legend([line_v, line_x])
-plt.show()
+pp.subplot(212)
+line_v, = pp.plot(time, v, label = 'v')
+line_x, = pp.plot(time, x, label = 'x')
+line_f, = pp.plot(time, f, label = 'u')
+pp.grid(True)
+pp.legend([line_v, line_x, line_f])
+pp.show()
 
 
