@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib.pyplot as pp
 
 from control_position_lqr import limit_control
+from pidcontroller import PIDController
 
 # motor constants
 L = 0.1
@@ -40,17 +41,11 @@ w = np.zeros(len(t))
 control = np.zeros(len(t))
 
 w_ref = 1.0
-last_error = None
-error_integral = 0.0
+pid = PIDController(Kp, Kd, Ki, w_ref, w[0])
 
 if __name__ == "__main__":
     for i in range(0, len(t) - 1):
-        error = w[i] - w_ref
-        if last_error == None:
-            last_error = w[i]
-        u = - limit_control(Kp * error + Kd * (error - last_error) / dt + Ki * error_integral, 12)
-        last_error = error
-        error_integral += error * dt
+        u = limit_control(pid.getControl(w[i], dt), 12)
         
         control[i] = u
 
