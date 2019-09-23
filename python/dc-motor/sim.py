@@ -18,6 +18,7 @@
 import numpy as np
 import matplotlib.pyplot as pp
 import scipy.integrate as integrate
+from math import pi, sin, cos
 
 # motor constants
 L = 0.1
@@ -29,6 +30,9 @@ U = 12.0
 m = 10.0
 r = 0.0025
 
+# Coulomb's friction
+Fc = 0.4
+
 dt = 0.01
 t = np.arange(0, 10.0, dt)
 w = np.zeros(len(t))
@@ -38,23 +42,19 @@ i = np.zeros(len(t))
 w2 = np.zeros(len(t))
 
 for j in range(0, len(t) - 1):
-    if t[j] > 5.0:
-        U = .0
+    U = 12.0 * sin(t[j] * pi / 4)
+    # if t[j] > 5.0:
+    #     U = .0
 
-    Tl = m * w[j] * r * r
-    di = (U - R * i[j] - k * w[j]) / L
-    dw = (k * i[j] - B * w[j]) / (J + m * r * r)
-
-    Tl = m * w2[j] * r * r
-    dw2 = (U * k / R - w2[j] * (B + k * k / R)) / (J + m * r * r)
+    di = (U - R * i[j] - k * w2[j]) / L
+    
+    dw2 = (U * k / R - w2[j] * (B + k * k / R) - Fc * np.sign(w2[j])) / (J + m * r * r)
 
     i[j + 1] = i[j] + di * dt
-    w[j + 1] = w[j] + dw * dt
     w2[j + 1] = w2[j] + dw2 * dt
 
 pp.plot(t, i, 'r')
-pp.plot(t, w, 'b')
-pp.plot(t, w2, 'k')
+pp.plot(t, w2, 'b')
 pp.grid(True)
 pp.show()
 
