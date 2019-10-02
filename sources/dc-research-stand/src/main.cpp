@@ -16,21 +16,21 @@
 #include <Arduino.h>
 
 // encoder pins
-#define OUTPUT_A  2
-#define OUTPUT_B  3
+#define OUTPUT_A  3 // PE5
+#define OUTPUT_B  2 // PE4
 
 // pulses per revolution
 #define PPR  2400
 #define SHAFT_R 0.00611
 
-#define PWM_PIN 5
-#define DIR_PIN 4
+#define PWM_PIN 10
+#define DIR_PIN 8
 
 #define MAX_STALL_U 5.0
 
-#define Kp  80.0
-#define Kd  -0.1
-#define Ki  40.0
+#define Kp  60.0
+#define Kd  20.1
+#define Ki  0.0
 
 volatile long encoderValue = 0;
 volatile long lastEncoded = 0;
@@ -88,16 +88,13 @@ float getSineControl(unsigned long now) {
   return amp * sin(w * now / 1000);
 }
 
-float getPIDControl(float value, float target, float dt) {
-  if (value != value) {
-    return 0.0;
-  }
+float getPIDControl(float value, float lastValue, float target, float dt) {
 
   error = target - value;
-  float de = (error - last_error) / dt;
+  float de = -(value - lastValue) / dt;
   integral_error += error * dt;
   last_error = error;
-  return -(Kp * error + Kd * de + Ki * integral_error);
+  return (Kp * error + Kd * de + Ki * integral_error);
 }
 
 float getAngle(long pulses) {
@@ -118,11 +115,11 @@ void loop() {
   lastAngle = angle;
 
   if (now - lastTargetUpdate > 2000) {
-    setPoint += PI / 3;
+    setPoint += PI;
     lastTargetUpdate = now;
   }
 
-  float orig_u = getPIDControl(angle, setPoint, dt);
+  float orig_u = getPIDControl(angle, lastAngle, setPoint, dt);
 
   u = saturate(avoidStall(orig_u), 255.0);
 
@@ -139,13 +136,12 @@ void loop() {
 
   lastTimeMillis = now;
 
-  delay(10);
+  delay(250);
 }
 
 void encoderHandler() {
-  int MSB = (PIND & (1 << OUTPUT_A)) >> OUTPUT_A; //MSB = most significant bit
-  int LSB = (PIND & (1 << OUTPUT_B)) >> OUTPUT_B; //LSB = least significant bit
-
+  int MSB = (PINE & (1 << PE5)) >> PE5; //MSB = most significant bit
+  int LSB = (PINE & (1 << PE4)) >> PE4; //LSB = least significant bit
   int encoded = (MSB << 1) | LSB; //converting the 2 pin value to single number
   int sum  = (lastEncoded << 2) | encoded; //adding it to the previous encoded value
 
