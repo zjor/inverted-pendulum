@@ -15,9 +15,13 @@
 
 #include <Arduino.h>
 
-// encoder pins
+// motor encoder pins
 #define OUTPUT_A  3 // PE5
 #define OUTPUT_B  2 // PE4
+
+// reference encoder pins
+#define REF_OUT_A 18 // PD3
+#define REF_OUT_B 19 // PD2
 
 // pulses per revolution
 #define PPR  2400
@@ -35,6 +39,9 @@
 volatile long encoderValue = 0;
 volatile long lastEncoded = 0;
 
+volatile long refEncoderValue = 0;
+volatile long lastRefEncoded = 0;
+
 unsigned long lastTimeMillis = 0;
 
 unsigned long lastTargetChange = 0;
@@ -46,13 +53,20 @@ float u = 0.0;
 float w = 2.0 * PI / 10.0;
 
 void encoderHandler();
+void refEncoderHandler();
 
 void setup() {
   pinMode(OUTPUT_A, INPUT_PULLUP);
   pinMode(OUTPUT_B, INPUT_PULLUP);
 
+  pinMode(REF_OUT_A, INPUT_PULLUP);
+  pinMode(REF_OUT_B, INPUT_PULLUP);
+
   attachInterrupt(digitalPinToInterrupt(OUTPUT_A), encoderHandler, CHANGE);
   attachInterrupt(digitalPinToInterrupt(OUTPUT_B), encoderHandler, CHANGE);
+
+  attachInterrupt(digitalPinToInterrupt(REF_OUT_A), refEncoderHandler, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(REF_OUT_B), refEncoderHandler, CHANGE);
 
   pinMode(PWM_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
@@ -108,34 +122,35 @@ float setPoint = PI / 3;
 
 void loop() {
 
-  unsigned long now = millis();
-  dt = 1.0 * (now - lastTimeMillis) / 1000.0;
-  float angle = getAngle(encoderValue);
-  float w = (angle - lastAngle) / dt;
-  lastAngle = angle;
+  // unsigned long now = millis();
+  // dt = 1.0 * (now - lastTimeMillis) / 1000.0;
+  // float angle = getAngle(encoderValue);
+  // float w = (angle - lastAngle) / dt;
+  // lastAngle = angle;
 
-  if (now - lastTargetUpdate > 2000) {
-    setPoint += PI;
-    lastTargetUpdate = now;
-  }
+  // if (now - lastTargetUpdate > 2000) {
+  //   setPoint += PI;
+  //   lastTargetUpdate = now;
+  // }
 
-  float orig_u = getPIDControl(angle, lastAngle, setPoint, dt);
+  // float orig_u = getPIDControl(angle, lastAngle, setPoint, dt);
 
-  u = saturate(avoidStall(orig_u), 255.0);
+  // u = saturate(avoidStall(orig_u), 255.0);
 
-  digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
-  analogWrite(PWM_PIN, fabs(u));  
+  // digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
+  // analogWrite(PWM_PIN, fabs(u));  
 
-  Serial.print(setPoint);
-  Serial.print("\t");
-  Serial.print(u / 255);
-  Serial.print("\t");
-  Serial.print(w, 4);
-  Serial.print("\t");
-  Serial.println(angle);
+  // Serial.print(setPoint);
+  // Serial.print("\t");
+  // Serial.print(u / 255);
+  // Serial.print("\t");
+  // Serial.print(w, 4);
+  // Serial.print("\t");
+  // Serial.println(angle);
 
-  lastTimeMillis = now;
+  // lastTimeMillis = now;
 
+  Serial.println(refEncoderValue);
   delay(250);
 }
 
@@ -153,4 +168,25 @@ void encoderHandler() {
   }
 
   lastEncoded = encoded; //store this value for next time  
+}
+
+/**
+ * Encoder attached to pins:
+ * Phase A - 18 PD3
+ * Phase B - 19 PD2
+ */
+void refEncoderHandler() {
+  int MSB = (PIND & (1 << PD3)) >> PD3; //MSB = most significant bit
+  int LSB = (PIND & (1 << PD2)) >> PD2; //LSB = least significant bit
+  int encoded = (MSB << 1) | LSB; //converting the 2 pin value to single number
+  int sum  = (lastRefEncoded << 2) | encoded; //adding it to the previous encoded value
+
+  if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) {
+    refEncoderValue++; //CW
+  }
+  if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) {
+    refEncoderValue--; //CCW
+  }
+
+  lastRefEncoded = encoded; //store this value for next time  
 }
