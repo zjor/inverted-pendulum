@@ -117,41 +117,36 @@ float getAngle(long pulses) {
 
 float lastAngle = .0;
 float lastW = .0;
-unsigned long lastTargetUpdate = 0;
-float setPoint = PI / 3;
+float setPoint = .0;
 
 void loop() {
 
-  // unsigned long now = millis();
-  // dt = 1.0 * (now - lastTimeMillis) / 1000.0;
-  // float angle = getAngle(encoderValue);
-  // float w = (angle - lastAngle) / dt;
-  // lastAngle = angle;
+  unsigned long now = millis();
+  dt = 1.0 * (now - lastTimeMillis) / 1000.0;
+  float angle = getAngle(encoderValue);
+  float w = (angle - lastAngle) / dt;
+  lastAngle = angle;
 
-  // if (now - lastTargetUpdate > 2000) {
-  //   setPoint += PI;
-  //   lastTargetUpdate = now;
-  // }
+  float orig_u = getPIDControl(angle, lastAngle, setPoint, dt);
 
-  // float orig_u = getPIDControl(angle, lastAngle, setPoint, dt);
+  u = saturate(avoidStall(orig_u), 255.0);
 
-  // u = saturate(avoidStall(orig_u), 255.0);
+  digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
+  analogWrite(PWM_PIN, fabs(u));  
 
-  // digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
-  // analogWrite(PWM_PIN, fabs(u));  
+  Serial.print(setPoint);
+  Serial.print("\t");
+  Serial.print(u / 255);
+  Serial.print("\t");
+  Serial.print(w, 4);
+  Serial.print("\t");
+  Serial.println(angle);
 
-  // Serial.print(setPoint);
-  // Serial.print("\t");
-  // Serial.print(u / 255);
-  // Serial.print("\t");
-  // Serial.print(w, 4);
-  // Serial.print("\t");
-  // Serial.println(angle);
+  lastTimeMillis = now;
 
-  // lastTimeMillis = now;
+  setPoint = PI * refEncoderValue / 5000;
 
-  Serial.println(refEncoderValue);
-  delay(250);
+  delay(10);
 }
 
 void encoderHandler() {
