@@ -30,7 +30,7 @@
 #define PWM_PIN 10
 #define DIR_PIN 8
 
-#define MAX_STALL_U 5.0
+#define MAX_STALL_U 8.0
 
 #define Kp  60.0
 #define Kd  20.1
@@ -56,6 +56,10 @@ void encoderHandler();
 void refEncoderHandler();
 
 void setup() {
+
+  // setting PWD frequency on pin 10 to 31kHz
+  TCCR2B = (TCCR2B & 0b11111000) | 0x01;
+
   pinMode(OUTPUT_A, INPUT_PULLUP);
   pinMode(OUTPUT_B, INPUT_PULLUP);
 
@@ -134,19 +138,19 @@ void loop() {
   digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
   analogWrite(PWM_PIN, fabs(u));  
 
-  Serial.print(setPoint);
-  Serial.print("\t");
-  Serial.print(u / 255);
-  Serial.print("\t");
-  Serial.print(w, 4);
-  Serial.print("\t");
-  Serial.println(angle);
+  // Serial.print(setPoint);
+  // Serial.print("\t");
+  // Serial.print(u / 255);
+  // Serial.print("\t");
+  // Serial.print(w, 4);
+  // Serial.print("\t");
+  // Serial.println(angle);
 
   lastTimeMillis = now;
 
-  setPoint = PI * refEncoderValue / 5000;
+  setPoint = 2.0 * PI * refEncoderValue / 5000;
 
-  delay(10);
+  delay(2);
 }
 
 void encoderHandler() {
