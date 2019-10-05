@@ -25,16 +25,17 @@
 
 // pulses per revolution
 #define PPR  2400
-#define SHAFT_R 0.00611
+#define SHAFT_R 0.00573
 
 #define PWM_PIN 10
 #define DIR_PIN 8
 
-#define MAX_STALL_U 8.0
+#define MAX_STALL_U 30.0
+#define POSITION_LIMIT  0.2
 
-#define Kp  60.0
-#define Kd  20.1
-#define Ki  0.0
+#define Kp  10000.0
+#define Kd  600.0
+#define Ki  2000.0
 
 volatile long encoderValue = 0;
 volatile long lastEncoded = 0;
@@ -44,13 +45,9 @@ volatile long lastRefEncoded = 0;
 
 unsigned long lastTimeMillis = 0;
 
-unsigned long lastTargetChange = 0;
-
-const long initialDelay = 2000;
-
 float amp = 255;
 float u = 0.0;
-float w = 2.0 * PI / 10.0;
+float w = 0.0;
 
 void encoderHandler();
 void refEncoderHandler();
@@ -79,7 +76,6 @@ void setup() {
 
   Serial.begin(9600);
   lastTimeMillis = 0L;
-  lastTargetChange = millis();
 }
 
 float dt = 0.0;
@@ -107,7 +103,6 @@ float getSineControl(unsigned long now) {
 }
 
 float getPIDControl(float value, float lastValue, float target, float dt) {
-
   error = target - value;
   float de = -(value - lastValue) / dt;
   integral_error += error * dt;
@@ -115,42 +110,63 @@ float getPIDControl(float value, float lastValue, float target, float dt) {
   return (Kp * error + Kd * de + Ki * integral_error);
 }
 
-float getAngle(long pulses) {
-  return 2.0 * PI * encoderValue / PPR;
+float getAngle(long pulses, long ppr) {
+  return 2.0 * PI * pulses / ppr;
 }
 
-float lastAngle = .0;
-float lastW = .0;
-float setPoint = .0;
+float getCartDistance(long pulses, long ppr) {
+  return 2.0 * PI * pulses / PPR * SHAFT_R;
+}
+
+float last_x = 0.;
+float set_point = 0.;
+
+unsigned long i = 0;
+
+float step_u = 254.0;
+boolean is_measuring = true;
 
 void loop() {
-
   unsigned long now = millis();
   dt = 1.0 * (now - lastTimeMillis) / 1000.0;
-  float angle = getAngle(encoderValue);
-  float w = (angle - lastAngle) / dt;
-  lastAngle = angle;
 
-  float orig_u = getPIDControl(angle, lastAngle, setPoint, dt);
+  float x = getCartDistance(encoderValue, PPR);
+  float v = (x - last_x) / dt;
+  if (is_measuring && fabs(x) < POSITION_LIMIT) {
+    u = step_u;
+    if (fabs(x) > 0.17) {
+      is_measuring = false;
+    }
+  } else {
+    float orig_u = getPIDControl(x, last_x, set_point, dt);
+    u = saturate(avoidStall(orig_u), 255.0);
+  }
+  
+  last_x = x;
 
-  u = saturate(avoidStall(orig_u), 255.0);
+  if (fabs(x) > POSITION_LIMIT) {
+    u = 0;
+  }
 
   digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
   analogWrite(PWM_PIN, fabs(u));  
 
-  // Serial.print(setPoint);
-  // Serial.print("\t");
-  // Serial.print(u / 255);
-  // Serial.print("\t");
-  // Serial.print(w, 4);
-  // Serial.print("\t");
-  // Serial.println(angle);
+  if (is_measuring) {
+    Serial.print(now);
+    Serial.print("\t");
+    Serial.print(u);
+    Serial.print("\t");
+    Serial.print(v, 4);
+    Serial.print("\t");
+    Serial.println(x * 100);
+  }
+  i++;
 
   lastTimeMillis = now;
 
-  setPoint = 2.0 * PI * refEncoderValue / 5000;
+  set_point = 2.0 * PI * refEncoderValue / 5000 * SHAFT_R;
 
-  delay(2);
+  delay(5);
 }
 
 void encoderHandler() {
