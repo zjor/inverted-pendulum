@@ -15,6 +15,8 @@
 
 #include <Arduino.h>
 
+#include "PID.h"
+
 // motor encoder pins
 #define OUTPUT_A  3 // PE5
 #define OUTPUT_B  2 // PE4
@@ -34,12 +36,13 @@
 #define POSITION_LIMIT  0.12
 #define THETA_THRESHOLD PI/10
 
-#define Kp  10000.0
-#define Kd  600.0
-#define Ki  2000.0
+#define Kp  1500.0
+#define Kd  100.0
+#define Ki  200.0
 
-#define thKp  8000.0
-#define thKd  200.0
+#define thKp  20000.0
+#define thKd  500.0
+#define thKi  0.0
 
 volatile long encoderValue = 0;
 volatile long lastEncoded = 0;
@@ -56,6 +59,9 @@ float filter_alpha = 0.5;
 
 void encoderHandler();
 void refEncoderHandler();
+
+PID cartPID(Kp, Kd, Ki, 0.);
+PID pendulumPID(thKp, thKd, thKi, 0.);
 
 void setup() {
 
@@ -84,8 +90,6 @@ void setup() {
 }
 
 float dt = 0.0;
-float last_error = 0.0;
-float integral_error = 0.0;
 
 float avoidStall(float u) {
   if (fabs(u) < MAX_STALL_U) {
@@ -100,14 +104,6 @@ float saturate(float v, float maxValue) {
   } else {
     return v;
   }
-}
-
-float getPIDControl(float value, float lastValue, float target, float dt) {
-  float error = target - value;
-  float de = -(value - lastValue) / dt;
-  integral_error += error * dt;
-  last_error = error;
-  return (Kp * error + Kd * de + Ki * integral_error);
 }
 
 float getAngle(long pulses, long ppr) {
@@ -160,10 +156,12 @@ void loop() {
   }
 
   if (isControllable(theta) && fabs(x) < POSITION_LIMIT && !is_docking) {
-    u = getControl(theta, w_filtered, x, v);
+    // u = getControl(theta, w_filtered, x, v);
+    u = -pendulumPID.getControl(theta, last_theta, dt);
+    u -= cartPID.getControl(x, last_x, dt);
     u = saturate(avoidStall(u), 240);
   } else if (is_docking) {
-    u = getPIDControl(x, last_x, 0., dt);
+    u = cartPID.getControl(x, last_x, dt);
     u = saturate(avoidStall(u), 240);
   } else {
     u = 0.;
