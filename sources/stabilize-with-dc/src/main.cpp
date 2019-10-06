@@ -19,23 +19,27 @@
 #define OUTPUT_A  3 // PE5
 #define OUTPUT_B  2 // PE4
 
-// reference encoder pins
+// pendulum encoder pins
 #define REF_OUT_A 18 // PD3
 #define REF_OUT_B 19 // PD2
 
-// pulses per revolution
-#define PPR  2400
+#define MOTOR_ENCODER_PPR  2400
 #define SHAFT_R 0.00573
+#define PENDULUM_ENCODER_PPR  10000
 
 #define PWM_PIN 10
 #define DIR_PIN 8
 
-#define MAX_STALL_U 30.0
-#define POSITION_LIMIT  0.2
+#define MAX_STALL_U 40.0
+#define POSITION_LIMIT  0.12
+#define THETA_THRESHOLD PI/10
 
 #define Kp  10000.0
 #define Kd  600.0
 #define Ki  2000.0
+
+#define thKp  8000.0
+#define thKd  200.0
 
 volatile long encoderValue = 0;
 volatile long lastEncoded = 0;
@@ -45,9 +49,10 @@ volatile long lastRefEncoded = 0;
 
 unsigned long lastTimeMillis = 0;
 
-float amp = 255;
-float u = 0.0;
-float w = 0.0;
+float theta = 0.;
+float last_theta = 0.;
+float last_w_filtered = 0.;
+float filter_alpha = 0.5;
 
 void encoderHandler();
 void refEncoderHandler();
@@ -79,7 +84,6 @@ void setup() {
 }
 
 float dt = 0.0;
-float error = 0.0;
 float last_error = 0.0;
 float integral_error = 0.0;
 
@@ -98,12 +102,8 @@ float saturate(float v, float maxValue) {
   }
 }
 
-float getSineControl(unsigned long now) {
-  return amp * sin(w * now / 1000);
-}
-
 float getPIDControl(float value, float lastValue, float target, float dt) {
-  error = target - value;
+  float error = target - value;
   float de = -(value - lastValue) / dt;
   integral_error += error * dt;
   last_error = error;
@@ -111,17 +111,31 @@ float getPIDControl(float value, float lastValue, float target, float dt) {
 }
 
 float getAngle(long pulses, long ppr) {
-  return 2.0 * PI * pulses / ppr;
+  return PI + 2.0 * PI * pulses / ppr;
 }
 
 float getCartDistance(long pulses, long ppr) {
-  return 2.0 * PI * pulses / PPR * SHAFT_R;
+  return 2.0 * PI * pulses / ppr * SHAFT_R;
 }
 
+float getControl(float th, float w, float x, float v) {
+  return thKp * th + thKd * w;
+}
+
+void driveMotor(float u) {
+  digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
+  analogWrite(PWM_PIN, fabs(u));
+}
+
+boolean isControllable(float theta) {
+  return fabs(theta) < THETA_THRESHOLD;
+}
+
+float x = 0.;
 float last_x = 0.;
-float set_point = 0.;
-float last_angle = 0.;
-float last_w_filtered = 0.;
+float u = 0.;
+
+float is_docking = false;
 
 unsigned long i = 0;
 
@@ -132,50 +146,49 @@ void loop() {
   }
   dt = 1.0 * (now - lastTimeMillis) / 1000.0;
 
-  // float x = getCartDistance(encoderValue, PPR);
-  // float v = (x - last_x) / dt;
-  // if (is_measuring && fabs(x) < POSITION_LIMIT) {
-  //   u = step_u;
-  //   if (fabs(x) > 0.17) {
-  //     is_measuring = false;
-  //   }
-  // } else {
-  //   float orig_u = getPIDControl(x, last_x, set_point, dt);
-  //   u = saturate(avoidStall(orig_u), 255.0);
-  // }
-  
-  // last_x = x;
-
-  // if (fabs(x) > POSITION_LIMIT) {
-  //   u = 0;
-  // }
-
-  // digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
-  // analogWrite(PWM_PIN, fabs(u));  
-
-  float angle = getAngle(refEncoderValue, 5000);
-  float w = (angle - last_angle) / dt;
-  last_angle = angle;
-  float alpha = 0.5;
-  float w_filtered = alpha * w + (1.0 - alpha) * last_w_filtered; 
+  theta = getAngle(refEncoderValue, PENDULUM_ENCODER_PPR);
+  float w = (theta - last_theta) / dt;
+  float w_filtered = filter_alpha * w + (1.0 - filter_alpha) * last_w_filtered;
+  last_theta = theta;
   last_w_filtered = w_filtered;
 
-  if (i % 2 == 0) {
-    Serial.print(w);
+  x = getCartDistance(encoderValue, MOTOR_ENCODER_PPR);
+  float v = (x - last_x) / dt;
+  last_x = x;
+  if (fabs(x) > POSITION_LIMIT) {
+    is_docking = true;
+  }
+
+  if (isControllable(theta) && fabs(x) < POSITION_LIMIT && !is_docking) {
+    u = getControl(theta, w_filtered, x, v);
+    u = saturate(avoidStall(u), 240);
+  } else if (is_docking) {
+    u = getPIDControl(x, last_x, 0., dt);
+    u = saturate(avoidStall(u), 240);
+  } else {
+    u = 0.;
+  }
+  driveMotor(u);
+
+  if (i % 10 == 0) {
+    Serial.print(theta, 4);
     Serial.print("\t");
-    Serial.print(w_filtered);
+    Serial.print(w, 4);
     Serial.print("\t");
-    Serial.println(angle);
+    Serial.print(x);
+    Serial.print("\t");
+    Serial.println(u);  
   }
   i++;
 
   lastTimeMillis = now;
 
-  set_point = 2.0 * PI * refEncoderValue / 5000 * SHAFT_R;
-
   delay(5);
 }
 
+/**
+ * Motor encoder handler
+ */
 void encoderHandler() {
   int MSB = (PINE & (1 << PE5)) >> PE5; //MSB = most significant bit
   int LSB = (PINE & (1 << PE4)) >> PE4; //LSB = least significant bit
@@ -193,6 +206,7 @@ void encoderHandler() {
 }
 
 /**
+ * Pendulum encoder handler
  * Encoder attached to pins:
  * Phase A - 18 PD3
  * Phase B - 19 PD2
