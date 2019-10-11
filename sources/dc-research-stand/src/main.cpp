@@ -52,7 +52,7 @@ volatile long lastEncoded = 0L;
 long startEncoderValue = 0L;
 
 unsigned long lastTimeMillis = 0L;
-unsigned long startTimeMillis = 0L;
+unsigned long startTimeMicros = 0L;
 
 unsigned long times[DATA_BUF_SIZE];
 unsigned long values[DATA_BUF_SIZE];
@@ -131,7 +131,7 @@ void driveMotor(float u) {
 void startMeasurements(int pwm) {
   Serial.print("\nRunning at PWM: "); Serial.println(pwm);
   index = 0;
-  startTimeMillis = millis();
+  startTimeMicros = micros();
   startEncoderValue = encoderValue;
   
   state = STATE_RUNNING;
@@ -156,22 +156,22 @@ void loop() {
             }
         }
     } else if (state == STATE_RUNNING) {
-        unsigned long now = millis();
-        unsigned long ticks = now - startTimeMillis;
+        unsigned long nowMicros = micros();
+        unsigned long ticks = nowMicros - startTimeMicros;
         long measurement = encoderValue - startEncoderValue;
 
         times[index] = ticks;
         values[index] = measurement;
         index++;
 
-        if (fabs(x) > POSITION_LIMIT || ticks > 5000 || index > DATA_BUF_SIZE) {
+        if (fabs(x) > POSITION_LIMIT || ticks > 5000000 || index > DATA_BUF_SIZE) {
             driveMotor(0);
             
             for (int i = 0; i < index; i++) {
               Serial.print(i);Serial.print(",");
               Serial.print(pwm);Serial.print(",");
               Serial.print(times[i]);Serial.print(",");
-              Serial.println(values[i]);
+              Serial.println(getCartDistance(values[i], PPR), 6);
             }
 
             state = STATE_HOMING;

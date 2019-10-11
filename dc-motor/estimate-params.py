@@ -26,10 +26,9 @@ def read_params(pwm):
     data = np.array(data)
     rows, cols = data.shape
     ext = np.zeros((rows, cols + 1))
-    ext[:,:-1] = data
-    ext[:, 3] = ext[:, 3] * 2.0 * pi / 2400.0 * 0.00573
+    ext[:,:-1] = data    
     for i in range(1, rows):
-        dt = (ext[i, 2] - ext[i - 1, 2]) / 1000.0
+        dt = (ext[i, 2] - ext[i - 1, 2]) / 1000000.0
         ext[i, -1] = (ext[i, 3] - ext[i - 1, 3]) / dt
     return ext
 
