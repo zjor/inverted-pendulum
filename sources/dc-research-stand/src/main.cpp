@@ -1,4 +1,10 @@
 /**
+ * == DC motor research stand ==
+ * 
+ * This software is used to collect data on DC motor acceleration profile in order to estimate
+ * motor's constants for further usage in control applications.
+ * 
+ * == Hardware specification ==
  * OMRON E6B2-CWZ6C pinout
  * - Brown - Vcc
  * - Black - Phase A
@@ -15,13 +21,11 @@
 
 #include <Arduino.h>
 
+#include "PID.h"
+
 // motor encoder pins
 #define OUTPUT_A  3 // PE5
 #define OUTPUT_B  2 // PE4
-
-// reference encoder pins
-#define REF_OUT_A 18 // PD3
-#define REF_OUT_B 19 // PD2
 
 // pulses per revolution
 #define PPR  2400
@@ -37,20 +41,40 @@
 #define Kd  600.0
 #define Ki  2000.0
 
-volatile long encoderValue = 0;
-volatile long lastEncoded = 0;
+#define STATE_PENDING_COMMAND 0
+#define STATE_RUNNING         1
+#define STATE_HOMING          2
 
-volatile long refEncoderValue = 0;
-volatile long lastRefEncoded = 0;
+#define DATA_BUF_SIZE 500
 
-unsigned long lastTimeMillis = 0;
+volatile long encoderValue = 0L;
+volatile long lastEncoded = 0L;
+long startEncoderValue = 0L;
+
+unsigned long lastTimeMillis = 0L;
+unsigned long startTimeMillis = 0L;
+
+unsigned long times[DATA_BUF_SIZE];
+unsigned long values[DATA_BUF_SIZE];
+int index = 0;
+
 
 float amp = 255;
 float u = 0.0;
 float w = 0.0;
+float dt = 0.0;
+
+float x, last_x;
+
+unsigned int state = STATE_PENDING_COMMAND;
+
+char buf[8];
+int buf_pos = 0;
+int pwm = 0;
+
+PID cartPID(Kp, Kd, Ki, 0.);
 
 void encoderHandler();
-void refEncoderHandler();
 
 void setup() {
 
@@ -60,14 +84,8 @@ void setup() {
   pinMode(OUTPUT_A, INPUT_PULLUP);
   pinMode(OUTPUT_B, INPUT_PULLUP);
 
-  pinMode(REF_OUT_A, INPUT_PULLUP);
-  pinMode(REF_OUT_B, INPUT_PULLUP);
-
   attachInterrupt(digitalPinToInterrupt(OUTPUT_A), encoderHandler, CHANGE);
   attachInterrupt(digitalPinToInterrupt(OUTPUT_B), encoderHandler, CHANGE);
-
-  attachInterrupt(digitalPinToInterrupt(REF_OUT_A), refEncoderHandler, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(REF_OUT_B), refEncoderHandler, CHANGE);
 
   pinMode(PWM_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
@@ -75,13 +93,9 @@ void setup() {
   digitalWrite(DIR_PIN, LOW);
 
   Serial.begin(9600);
+  Serial.println("Enter PWM");
   lastTimeMillis = 0L;
 }
-
-float dt = 0.0;
-float error = 0.0;
-float last_error = 0.0;
-float integral_error = 0.0;
 
 float avoidStall(float u) {
   if (fabs(u) < MAX_STALL_U) {
@@ -98,82 +112,88 @@ float saturate(float v, float maxValue) {
   }
 }
 
-float getSineControl(unsigned long now) {
-  return amp * sin(w * now / 1000);
-}
-
-float getPIDControl(float value, float lastValue, float target, float dt) {
-  error = target - value;
-  float de = -(value - lastValue) / dt;
-  integral_error += error * dt;
-  last_error = error;
-  return (Kp * error + Kd * de + Ki * integral_error);
-}
-
-float getAngle(long pulses, long ppr) {
-  return 2.0 * PI * pulses / ppr;
-}
-
 float getCartDistance(long pulses, long ppr) {
   return 2.0 * PI * pulses / PPR * SHAFT_R;
 }
 
-float last_x = 0.;
-float set_point = 0.;
-float last_angle = 0.;
-float last_w_filtered = 0.;
+void clear_buf(char *buf, int len) {
+    int i = 0;
+    while (i < len) {
+        buf[i++] = 0;
+    }
+}
 
-unsigned long i = 0;
+void driveMotor(float u) {
+  digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
+  analogWrite(PWM_PIN, fabs(u));
+}
 
-void loop() {
-  unsigned long now = millis();
-  if (now < 10) {
-    return;
-  }
-  dt = 1.0 * (now - lastTimeMillis) / 1000.0;
-
-  // float x = getCartDistance(encoderValue, PPR);
-  // float v = (x - last_x) / dt;
-  // if (is_measuring && fabs(x) < POSITION_LIMIT) {
-  //   u = step_u;
-  //   if (fabs(x) > 0.17) {
-  //     is_measuring = false;
-  //   }
-  // } else {
-  //   float orig_u = getPIDControl(x, last_x, set_point, dt);
-  //   u = saturate(avoidStall(orig_u), 255.0);
-  // }
+void startMeasurements(int pwm) {
+  Serial.print("\nRunning at PWM: "); Serial.println(pwm);
+  index = 0;
+  startTimeMillis = millis();
+  startEncoderValue = encoderValue;
   
-  // last_x = x;
+  state = STATE_RUNNING;
 
-  // if (fabs(x) > POSITION_LIMIT) {
-  //   u = 0;
-  // }
+  driveMotor(pwm);    
+}
 
-  // digitalWrite(DIR_PIN, u > 0.0 ? LOW : HIGH);
-  // analogWrite(PWM_PIN, fabs(u));  
+void loop() {    
+    x = getCartDistance(encoderValue, PPR);
 
-  float angle = getAngle(refEncoderValue, 5000);
-  float w = (angle - last_angle) / dt;
-  last_angle = angle;
-  float alpha = 0.5;
-  float w_filtered = alpha * w + (1.0 - alpha) * last_w_filtered; 
-  last_w_filtered = w_filtered;
+    if (state == STATE_PENDING_COMMAND) {
+        if (Serial.available() > 0) {
+            int c = Serial.read();
+            if (isDigit(c) && buf_pos < 8) {
+                buf[buf_pos++] = (char)c;
+                Serial.print((char)c);
+            } else if (c == '\n') {
+                pwm = atoi(buf);
+                buf_pos = 0;
+                clear_buf(buf, 8);
+                startMeasurements(pwm);
+            }
+        }
+    } else if (state == STATE_RUNNING) {
+        unsigned long now = millis();
+        unsigned long ticks = now - startTimeMillis;
+        long measurement = encoderValue - startEncoderValue;
 
-  if (i % 2 == 0) {
-    Serial.print(w);
-    Serial.print("\t");
-    Serial.print(w_filtered);
-    Serial.print("\t");
-    Serial.println(angle);
-  }
-  i++;
+        times[index] = ticks;
+        values[index] = measurement;
+        index++;
 
-  lastTimeMillis = now;
+        if (fabs(x) > POSITION_LIMIT || ticks > 5000 || index > DATA_BUF_SIZE) {
+            driveMotor(0);
+            
+            for (int i = 0; i < index; i++) {
+              Serial.print(i);Serial.print(",");
+              Serial.print(pwm);Serial.print(",");
+              Serial.print(times[i]);Serial.print(",");
+              Serial.println(values[i]);
+            }
 
-  set_point = 2.0 * PI * refEncoderValue / 5000 * SHAFT_R;
-
-  delay(5);
+            state = STATE_HOMING;
+            Serial.println("Homing...");
+        }
+        delay(5);
+    } else if (state == STATE_HOMING) {
+        if (fabs(x) <= 0.005) {
+          driveMotor(0);
+          state = STATE_PENDING_COMMAND;
+          Serial.println("Homing complete\nEnter PWM");
+          return;
+        }
+        unsigned long now = millis();
+        dt = 1.0 * (now - lastTimeMillis) / 1000.0;
+        lastTimeMillis = now;
+        u = cartPID.getControl(x, last_x, dt);
+        driveMotor(saturate(avoidStall(u), 240));
+        delay(5);
+    }
+    
+    last_x = x;    
 }
 
 void encoderHandler() {
@@ -190,25 +210,4 @@ void encoderHandler() {
   }
 
   lastEncoded = encoded; //store this value for next time  
-}
-
-/**
- * Encoder attached to pins:
- * Phase A - 18 PD3
- * Phase B - 19 PD2
- */
-void refEncoderHandler() {
-  int MSB = (PIND & (1 << PD3)) >> PD3; //MSB = most significant bit
-  int LSB = (PIND & (1 << PD2)) >> PD2; //LSB = least significant bit
-  int encoded = (MSB << 1) | LSB; //converting the 2 pin value to single number
-  int sum  = (lastRefEncoded << 2) | encoded; //adding it to the previous encoded value
-
-  if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) {
-    refEncoderValue++; //CW
-  }
-  if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) {
-    refEncoderValue--; //CCW
-  }
-
-  lastRefEncoded = encoded; //store this value for next time  
 }
