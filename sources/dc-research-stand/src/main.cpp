@@ -145,7 +145,7 @@ void loop() {
     if (state == STATE_PENDING_COMMAND) {
         if (Serial.available() > 0) {
             int c = Serial.read();
-            if (isDigit(c) && buf_pos < 8) {
+            if ((isDigit(c) || c == '-') && buf_pos < 8) {
                 buf[buf_pos++] = (char)c;
                 Serial.print((char)c);
             } else if (c == '\n') {
