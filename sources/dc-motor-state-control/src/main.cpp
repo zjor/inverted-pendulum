@@ -33,14 +33,14 @@
 
 #define MAX_STALL_U 45.0
 #define POSITION_LIMIT  0.2
-#define X0  0.05
+#define X0  0.065
 
 #define A 35.98
 #define B 2.22
 #define C -2.79
 
-#define Kx  203.4
-#define Kv  35.1
+#define Kx  285.4
+#define Kv  37.1
 
 volatile long encoderValue = 0L;
 volatile long lastEncoded = 0L;
