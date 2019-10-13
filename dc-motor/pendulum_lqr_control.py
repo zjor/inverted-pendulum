@@ -7,7 +7,7 @@ import matplotlib.pyplot as pp
 
 l = .3 # rod length is 2l
 m = (2*l)*(.006**2)*(3.14/4)*7856 # rod 6 mm diameter, 44cm length, 7856 kg/m^3
-M = .3
+M = .4
 dt = 0.005
 g = 9.8
 
@@ -20,11 +20,10 @@ def dlqr(A,B,Q,R):
     """
     #ref Bertsekas, p.151 
     #first, try to solve the ricatti equation
-    X = np.matrix(scipy.linalg.solve_discrete_are(A, B, Q, R))     
+    P = np.matrix(scipy.linalg.solve_discrete_are(A, B, Q, R))     
     #compute the LQR gain
-    K = np.matrix(scipy.linalg.inv(B.T*X*B+R)*(B.T*X*A))    
-    eigVals, eigVecs = scipy.linalg.eig(A-B*K)     
-    return K, X, eigVals
+    K = np.matrix(scipy.linalg.inv(B.T*P*B+R)*(B.T*P*A))
+    return -K
 
 def getControlGains(dt):    
     A = np.matrix([
@@ -38,13 +37,12 @@ def getControlGains(dt):
         ]).T
     Q = np.matrix([
         [1.0, 0.0, 0.0, 0.0],
-        [0.0, 0.1, 0.0, 0.0],
+        [0.0, .0001, 0.0, 0.0],
         [0.0, 0.0, 1.0, 0.0],
-        [0.0, 0.0, 0.0, 0.1],
+        [0.0, 0.0, 0.0, .0001],
         ])
-    R = np.matrix([0.01])
-    K, X, eig = dlqr(A, B, Q, R)
-    return K
+    R = np.matrix([0.0005])
+    return dlqr(A, B, Q, R)    
 
 K = getControlGains(dt)
 
