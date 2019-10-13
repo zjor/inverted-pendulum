@@ -33,10 +33,14 @@
 
 #define MAX_STALL_U 45.0
 #define POSITION_LIMIT  0.2
+#define X0  0.05
 
 #define A 35.98
 #define B 2.22
 #define C -2.79
+
+#define Kx  203.4
+#define Kv  35.1
 
 volatile long encoderValue = 0L;
 volatile long lastEncoded = 0L;
@@ -120,17 +124,16 @@ void loop() {
   x = getCartDistance(encoderValue, PPR);
   v = (x - last_x) / dt;
 
-  float control = - (120.0 * (x - 0.05) + 15.0 * v);
+  float control = - (Kx * (x - X0) + Kv * v);
   float u = (control + A * v - C * sign(v)) / B;
   u = 255.0 * u / 12.0;
-  // u = avoidStall(u);
 
   last_x = x;
   lastTimeMicros = now;
 
   driveMotor(saturate(u, 250));
   
-  // log_state(control, u);
+  log_state(control, u);
   
   delay(5);
 }
