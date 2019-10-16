@@ -41,7 +41,7 @@ def getControlGains(dt):
         [0.0, 0.0, 1.0, 0.0],
         [0.0, 0.0, 0.0, .0001],
         ])
-    R = np.matrix([0.0005])
+    R = np.matrix([0.0003])
     return dlqr(A, B, Q, R)    
 
 K = getControlGains(dt)

@@ -40,12 +40,12 @@
 #define A 35.98
 #define B 2.22
 #define C 2.79
-// #define C 0.0
 
-#define Kth 120.1
-#define Kw  27.0
-#define Kx  35.0
-#define Kv  27.5
+#define Kth 147.1
+#define Kw  36.0
+#define Kx  54.0
+#define Kv  39.5
+
 
 volatile long encoderValue = 0L;
 volatile long lastEncoded = 0L;
@@ -58,8 +58,6 @@ unsigned long lastTimeMicros = 0L;
 
 float x, last_x, v, dt;
 float theta, last_theta, w;
-float w_filtered, last_w_filtered;
-float filter_alpha = 0.6;
 float control, u;
 
 unsigned long log_prescaler = 0;
@@ -119,6 +117,10 @@ boolean isControllable(float theta) {
 }
 
 void log_state(float control, float u) {
+  if (fabs(w) > 100) {
+    return;
+  }
+
   if (log_prescaler % 20 == 0) {
     Serial.print(theta, 4);Serial.print("\t");
     Serial.print(w, 4);Serial.print("\t");
@@ -130,28 +132,14 @@ void log_state(float control, float u) {
   log_prescaler++;
 }
 
-const int buf_len = 4;
-unsigned long counter;
-float xs[buf_len], ths[buf_len];
-unsigned long times[buf_len];
-
 void loop() {
   now = micros();
   dt = 1.0 * (now - lastTimeMicros) / 1000000;
-  float smooth_dt = 1.0 * (now - times[counter % buf_len]) / 1000000;
   x = getCartDistance(encoderValue, PPR);
-  // v = (x - last_x) / dt;
-  v = (x - xs[counter % buf_len]) / smooth_dt;
+  v = (x - last_x) / dt;
 
   theta = getAngle(refEncoderValue, PENDULUM_ENCODER_PPR);
-  // w = (theta - last_theta) / dt;
-  w = (theta - ths[counter % buf_len]) / smooth_dt;
-  // w_filtered = filter_alpha * w + (1.0 - filter_alpha) * last_w_filtered;
-
-  xs[counter % buf_len] = x;
-  ths[counter % buf_len] = theta;
-  times[counter % buf_len] = now;
-  counter++;
+  w = (theta - last_theta) / dt;
 
   if (isControllable(theta) && fabs(x) < POSITION_LIMIT) {
     control = (Kx * x + Kv * v + Kth * theta + Kw * w);
@@ -164,7 +152,6 @@ void loop() {
   
   last_x = x;
   last_theta = theta;
-  last_w_filtered = w_filtered;
   lastTimeMicros = now;
     
   log_state(control, u);
