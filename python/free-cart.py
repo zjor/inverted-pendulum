@@ -79,7 +79,7 @@ pxs = L * sin(ths) + xs
 pys = L * cos(ths)
 
 fig = pp.figure()
-ax = fig.add_subplot(111, autoscale_on=False, xlim=(-2, 2), ylim=(-2, 2))
+ax = fig.add_subplot(111, autoscale_on=False, xlim=(-1.3, 1.3), ylim=(-1.2, 1.0))
 ax.set_aspect('equal')
 ax.grid()
 
@@ -116,9 +116,10 @@ ani = animation.FuncAnimation(fig, animate, np.arange(1, len(solution)),
 pp.show()
 
 # Set up formatting for the movie files
-# Writer = animation.writers['ffmpeg']
-# writer = Writer(fps=15, metadata=dict(artist='Sergey Royz'), bitrate=1800)
-# ani.save('free-cart.mp4', writer=writer)
+print("Writing video...")
+Writer = animation.writers['imagemagick']
+writer = Writer(fps=25, metadata=dict(artist='Sergey Royz'), bitrate=1800)
+ani.save('free-cart.gif', writer=writer)
 
 
 

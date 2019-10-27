@@ -16,6 +16,10 @@ State:
 """
 
 import numpy as np
+
+import matplotlib
+matplotlib.use('TKAgg')
+
 import matplotlib.pyplot as pp
 import scipy.integrate as integrate
 import matplotlib.animation as animation
@@ -35,12 +39,12 @@ m = 0.5
 
 # simulation time
 dt = 0.05
-Tmax = 20
+Tmax = 5
 t = np.arange(0.0, Tmax, dt)
 
 # initial conditions
 Y = .0 		# pendulum angular velocity
-th = pi/8	# pendulum angle
+th = pi/10	# pendulum angle
 x = .0		# cart position
 x0 = 0		# desired cart position
 Z = .0		# cart velocity
@@ -72,22 +76,15 @@ def derivatives(state, t):
 	_Y = state[1]
 	_x = state[2]
 	_Z = state[3]
-	_th_h = state[4]
-	_Y_h = state[5]
 
-	x0 = step(t)
+	# x0 = step(t)
 
-	y = trim(_th, precision)
-
-	u = Kp_th * _th_h + Kd_th * _Y_h + Kp_x * (_x - x0) + Kd_x * _Z
+	u = Kp_th * _th + Kd_th * _Y + Kp_x * (_x - x0) + Kd_x * _Z
 
 	ds[0] = state[1]
 	ds[1] = (g * sin(_th) - u * cos(_th)) / L
 	ds[2] = state[3]
 	ds[3] = u
-
-	ds[4] = _Y_h + k * (y - _th_h)
-	ds[5] = (g * _th_h - u) / L
 
 	return ds
 
@@ -103,7 +100,7 @@ pxs = L * sin(ths) + xs
 pys = L * cos(ths)
 
 fig = pp.figure()
-ax = fig.add_subplot(111, autoscale_on=False, xlim=(-2, 2), ylim=(-1, 2))
+ax = fig.add_subplot(111, autoscale_on=False, xlim=(-1.5, 1.5), ylim=(-0.5, 2))
 ax.set_aspect('equal')
 ax.grid()
 
@@ -140,6 +137,7 @@ ani = animation.FuncAnimation(fig, animate, np.arange(1, len(solution)),
 pp.show()
 
 # Set up formatting for the movie files
-# Writer = animation.writers['ffmpeg']
-# writer = Writer(fps=15, metadata=dict(artist='Sergey Royz'), bitrate=1800)
-# ani.save('controlled-cart.mp4', writer=writer)
+print("Writing video...")
+Writer = animation.writers['imagemagick']
+writer = Writer(fps=25, metadata=dict(artist='Sergey Royz'), bitrate=1800)
+ani.save('controlled-cart.gif', writer=writer)
