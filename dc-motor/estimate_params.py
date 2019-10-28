@@ -50,13 +50,15 @@ def read_all():
     return result
 
 def plot_velocity(data):
-    for value in data.values():
+    for value in sorted(data.values(), key=lambda x: -x[0, 1]):
         times = value[:,2] / 1000000.0        
         u = 12.0 * value[0, 1] / 255
         curve = integrate_curve(f_a, f_b, f_c, u, times)
-        pp.plot(times, value[:, 4], label=u)
-        pp.plot(times, curve, label=u)
+        pp.plot(times[:100], value[:, 4][:100], label=("%.1fV" % u))
+        pp.plot(times[:100], curve[:100])
     pp.legend()
+    pp.xlabel("Time, s")
+    pp.ylabel("Velocity, m/s")
     pp.grid(True)
     pp.show()
 
