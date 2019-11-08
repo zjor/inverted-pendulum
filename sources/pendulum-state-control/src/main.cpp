@@ -35,7 +35,6 @@
 #define DIR_PIN 8
 
 #define POSITION_LIMIT  0.145
-#define THETA_THRESHOLD PI/12
 
 #define A 35.98
 #define B 2.22
@@ -46,6 +45,8 @@
 #define Kx  54.0
 #define Kv  39.5
 
+const float THETA_THRESHOLD = PI / 12;
+const float PI2 = 2.0 * PI;
 
 volatile long encoderValue = 0L;
 volatile long lastEncoded = 0L;
@@ -99,8 +100,15 @@ float saturate(float v, float maxValue) {
   }
 }
 
-float getAngle(long pulses, long ppr) {
-  return (PI + 2.0 * PI * pulses / ppr);
+float getAngle(long pulses, long ppr) {  
+  float angle = (PI + PI2 * pulses / ppr);
+  while (angle > PI) {
+    angle -= PI2;
+  }
+  while (angle < -PI) {
+    angle += PI2;
+  }
+  return angle;
 }
 
 float getCartDistance(long pulses, long ppr) {
