@@ -36,6 +36,11 @@
 
 #define POSITION_LIMIT  0.145
 
+#define STATE_CALIBRATE 0
+#define STATE_SWING_UP  1
+#define STATE_BALANCE   2
+#define STATE_FULL_STOP 3
+
 #define A 35.98
 #define B 2.22
 #define C 2.79
@@ -63,8 +68,12 @@ float control, u;
 
 unsigned long log_prescaler = 0;
 
+int state = STATE_CALIBRATE;
+
 void encoderHandler();
 void refEncoderHandler();
+
+void calibrate();
 
 void setup() {
 
@@ -140,6 +149,21 @@ void log_state(float control, float u) {
   log_prescaler++;
 }
 
+float getBalancingControl(float x, float v, float theta, float w) {
+  return Kx * x + Kv * v + Kth * theta + Kw * w;
+}
+
+float getSwingUpControl(float theta, float w) {
+  float K = 0.2;
+  return -K * w * cos(PI - theta);
+}
+
+void driveMotorWithControl(float control, float v) {
+  u = (control + A * v + copysignf(C, v)) / B;
+  u = 255.0 * u / 12.0;
+  driveMotor(saturate(u, 254));
+}
+
 void loop() {
   now = micros();
   dt = 1.0 * (now - lastTimeMicros) / 1000000;
@@ -149,13 +173,34 @@ void loop() {
   theta = getAngle(refEncoderValue, PENDULUM_ENCODER_PPR);
   w = (theta - last_theta) / dt;
 
-  if (isControllable(theta) && fabs(x) < POSITION_LIMIT) {
-    control = (Kx * x + Kv * v + Kth * theta + Kw * w);
-    u = (control + A * v + copysignf(C, v)) / B;
-    u = 255.0 * u / 12.0;
-    driveMotor(saturate(u, 254));
-  } else {
-    driveMotor(0);
+  if (fabs(x) >= POSITION_LIMIT) {
+    if (state != STATE_FULL_STOP) {
+      Serial.println("Cart reached end of rail");
+    }
+    state = STATE_FULL_STOP;
+  }
+
+  switch (state) {
+    case STATE_CALIBRATE:
+      Serial.println("Waiting for the pendulum to come to rest...");
+      calibrate();
+      Serial.println("Pendulum is at rest");
+      state = STATE_SWING_UP;
+      break;
+    case STATE_SWING_UP:      
+      control = getSwingUpControl(theta, w);
+      driveMotorWithControl(control, v);
+      if (isControllable(theta)) {
+        state = STATE_BALANCE;
+      }
+      break;
+    case STATE_BALANCE:
+      control = getBalancingControl(x, v, theta, w);
+      driveMotorWithControl(control, v);
+      break;
+    case STATE_FULL_STOP:
+      driveMotor(0);
+      break;
   }
   
   last_x = x;
@@ -206,4 +251,18 @@ void refEncoderHandler() {
   }
 
   lastRefEncoded = encoded; //store this value for next time  
+}
+
+/**
+ * Waits till pendulum stays at rest in the vertical position
+ */
+void calibrate() {
+  long lastReading;
+  do {
+    lastReading = refEncoderValue;
+    delay(1000);
+  } while (lastReading != refEncoderValue);
+  cli();
+  refEncoderValue = 0;
+  sei();
 }
