@@ -138,14 +138,18 @@ void log_state(float control, float u) {
     return;
   }
 
-  if (log_prescaler % 20 == 0) {
+  if (state == STATE_FULL_STOP) {
+    return;
+  }
+
+  // if (log_prescaler % 5 == 0) {
     Serial.print(theta, 4);Serial.print("\t");
     Serial.print(w, 4);Serial.print("\t");
     Serial.print(x, 4);Serial.print("\t");
     Serial.print(v, 4);Serial.print("\t");
     Serial.print(control, 4);Serial.print("\t");
     Serial.println(u, 4);
-  }
+  // }
   log_prescaler++;
 }
 
@@ -153,9 +157,14 @@ float getBalancingControl(float x, float v, float theta, float w) {
   return Kx * x + Kv * v + Kth * theta + Kw * w;
 }
 
-float getSwingUpControl(float theta, float w) {
-  float K = 0.2;
-  return -K * w * cos(PI - theta);
+float getSwingUpControl(float x, float v, float theta, float w) {
+  float K = 12.0;
+  float c = -copysignf(K, - w * cos(theta));
+  float lim = 0.01;
+  if ((x >= lim && c > 0) || (x <= -lim && c < 0) || fabs(theta) < PI / 2) {
+    c = -(A * v + copysignf(C, v));
+  }
+  return c;
 }
 
 void driveMotorWithControl(float control, float v) {
@@ -188,7 +197,7 @@ void loop() {
       state = STATE_SWING_UP;
       break;
     case STATE_SWING_UP:      
-      control = getSwingUpControl(theta, w);
+      control = getSwingUpControl(x, v, theta, w);
       driveMotorWithControl(control, v);
       if (isControllable(theta)) {
         state = STATE_BALANCE;
@@ -206,7 +215,7 @@ void loop() {
   last_x = x;
   last_theta = theta;
   lastTimeMicros = now;
-    
+      
   log_state(control, u);
   
   delay(5);
