@@ -38,12 +38,14 @@
 #define PWM_PIN 10
 #define DIR_PIN 8
 
-#define POSITION_LIMIT  0.145
+#define POSITION_LIMIT  0.1 //0.145
 
 #define STATE_CALIBRATE 0
 #define STATE_SWING_UP  1
 #define STATE_BALANCE   2
 #define STATE_FULL_STOP 3
+#define STATE_GO_RIGHT  4 
+#define STATE_GO_LEFT   5
 
 #define A 35.98
 #define B 2.22
@@ -75,7 +77,8 @@ float control, u;
 
 unsigned long log_prescaler = 0;
 
-int state = STATE_CALIBRATE;
+// int state = STATE_CALIBRATE;
+int state = STATE_GO_RIGHT;
 
 void encoderHandler();
 void refEncoderHandler();
@@ -160,6 +163,7 @@ void log_state(float control, float u) {
   }
 
   // if (log_prescaler % 5 == 0) {
+    Serial.print(state);Serial.print("\t");
     Serial.print(theta, 4);Serial.print("\t");
     Serial.print(w, 4);Serial.print("\t");
     Serial.print(x, 4);Serial.print("\t");
@@ -184,6 +188,12 @@ float getSwingUpControl(float x, float v, float theta, float w) {
   return c;
 }
 
+float getVelocityControl(float v, float target) {
+  float error = target - v;
+  float Kp = 50.0;
+  return Kp * error;
+}
+
 void driveMotorWithControl(float control, float v) {
   u = (control + A * v + copysignf(C, v)) / B;
   u = 255.0 * u / 12.0;
@@ -199,11 +209,15 @@ void loop() {
 
   if (rightSwitchPressed) {
     rightSwitchPressed = false;
-    Serial.println("Right switch pressed");
+    Serial.println("The cart has reached the right end");
+    if (state == STATE_GO_RIGHT) {
+      state = STATE_GO_LEFT;
+      Serial.println("Going left...");
+    } else {
+      state = STATE_FULL_STOP;
+      Serial.println("Unexpected state. Halt.");
+    }    
   }
-
-  return;
-
 
   now = micros();
   dt = 1.0 * (now - lastTimeMicros) / 1000000;
@@ -221,6 +235,14 @@ void loop() {
   }
 
   switch (state) {
+    case STATE_GO_RIGHT:
+      control = getVelocityControl(v, 0.06);
+      driveMotorWithControl(control, v);
+      break;
+    case STATE_GO_LEFT:
+      control = getVelocityControl(v, -0.06);
+      driveMotorWithControl(control, v);
+      break;
     case STATE_CALIBRATE:
       Serial.println("Waiting for the pendulum to come to rest...");
       calibrate();
