@@ -26,6 +26,10 @@
 #define REF_OUT_A 18 // PD3
 #define REF_OUT_B 19 // PD2
 
+// terminal switches pins
+#define SWITCH_RIGHT  21
+#define SWITCH_LEFT  20
+
 // pulses per revolution
 #define PPR  2400
 #define SHAFT_R 0.00573
@@ -59,6 +63,9 @@ volatile long lastEncoded = 0L;
 volatile long refEncoderValue = 0;
 volatile long lastRefEncoded = 0;
 
+volatile boolean leftSwitchPressed = false;
+volatile boolean rightSwitchPressed = false;
+
 unsigned long now = 0L;
 unsigned long lastTimeMicros = 0L;
 
@@ -73,6 +80,9 @@ int state = STATE_CALIBRATE;
 void encoderHandler();
 void refEncoderHandler();
 
+void leftSwitchHandler();
+void rightSwitchHandler();
+
 void calibrate();
 
 void setup() {
@@ -86,11 +96,18 @@ void setup() {
   pinMode(REF_OUT_A, INPUT_PULLUP);
   pinMode(REF_OUT_B, INPUT_PULLUP);
 
+  pinMode(SWITCH_LEFT, INPUT);
+  pinMode(SWITCH_RIGHT, INPUT);
+
   attachInterrupt(digitalPinToInterrupt(OUTPUT_A), encoderHandler, CHANGE);
   attachInterrupt(digitalPinToInterrupt(OUTPUT_B), encoderHandler, CHANGE);
 
   attachInterrupt(digitalPinToInterrupt(REF_OUT_A), refEncoderHandler, CHANGE);
   attachInterrupt(digitalPinToInterrupt(REF_OUT_B), refEncoderHandler, CHANGE);
+
+  attachInterrupt(digitalPinToInterrupt(SWITCH_LEFT), leftSwitchHandler, FALLING);
+  attachInterrupt(digitalPinToInterrupt(SWITCH_RIGHT), rightSwitchHandler, FALLING);
+
 
   pinMode(PWM_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
@@ -174,6 +191,20 @@ void driveMotorWithControl(float control, float v) {
 }
 
 void loop() {
+
+  if (leftSwitchPressed) {
+    leftSwitchPressed = false;
+    Serial.println("Left switch was pressed");
+  }
+
+  if (rightSwitchPressed) {
+    rightSwitchPressed = false;
+    Serial.println("Right switch pressed");
+  }
+
+  return;
+
+
   now = micros();
   dt = 1.0 * (now - lastTimeMicros) / 1000000;
   x = getCartDistance(encoderValue, PPR);
@@ -274,4 +305,12 @@ void calibrate() {
   cli();
   refEncoderValue = 0;
   sei();
+}
+
+void leftSwitchHandler() {
+  leftSwitchPressed = true;
+}
+
+void rightSwitchHandler() {
+  rightSwitchPressed = true;
 }
