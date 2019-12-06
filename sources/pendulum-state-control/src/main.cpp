@@ -38,7 +38,7 @@
 #define PWM_PIN 10
 #define DIR_PIN 8
 
-#define POSITION_LIMIT  0.1 //0.145
+#define POSITION_LIMIT  0.5 //0.145
 
 #define STATE_CALIBRATE 0
 #define STATE_SWING_UP  1
@@ -70,6 +70,9 @@ volatile boolean rightSwitchPressed = false;
 
 unsigned long now = 0L;
 unsigned long lastTimeMicros = 0L;
+
+// pulses count before the right switch pressed
+long rightSwitchPulses;
 
 float x, last_x, v, dt;
 float theta, last_theta, w;
@@ -188,10 +191,20 @@ float getSwingUpControl(float x, float v, float theta, float w) {
   return c;
 }
 
-float getVelocityControl(float v, float target) {
+float integralError = 0.0;
+float lastTarget = 0.0;
+float getVelocityControl(float v, float target, float dt) {
+
+  if (lastTarget != target) {
+    lastTarget = target;
+    integralError = 0.0;
+  }
+
   float error = target - v;
   float Kp = 50.0;
-  return Kp * error;
+  float Ki = 10.0;
+  integralError += Ki * error * dt;
+  return Kp * error + integralError;
 }
 
 void driveMotorWithControl(float control, float v) {
@@ -204,11 +217,17 @@ void loop() {
 
   if (leftSwitchPressed) {
     leftSwitchPressed = false;
-    Serial.println("Left switch was pressed");
+    Serial.println("The cart has reached the left end");
+    long lengthPulses = rightSwitchPulses - encoderValue;
+    float railLength = getCartDistance(lengthPulses, PPR);
+    Serial.print(lengthPulses); Serial.print("\t");
+    Serial.println(railLength);
+    state = STATE_FULL_STOP;   
   }
 
   if (rightSwitchPressed) {
     rightSwitchPressed = false;
+    rightSwitchPulses = encoderValue;
     Serial.println("The cart has reached the right end");
     if (state == STATE_GO_RIGHT) {
       state = STATE_GO_LEFT;
@@ -236,11 +255,11 @@ void loop() {
 
   switch (state) {
     case STATE_GO_RIGHT:
-      control = getVelocityControl(v, 0.06);
+      control = getVelocityControl(v, 0.06, dt);
       driveMotorWithControl(control, v);
       break;
     case STATE_GO_LEFT:
-      control = getVelocityControl(v, -0.06);
+      control = getVelocityControl(v, -0.06, dt);
       driveMotorWithControl(control, v);
       break;
     case STATE_CALIBRATE:
