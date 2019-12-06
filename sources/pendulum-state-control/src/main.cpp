@@ -38,7 +38,7 @@
 #define PWM_PIN 10
 #define DIR_PIN 8
 
-#define POSITION_LIMIT  0.5 //0.145
+#define POSITION_LIMIT  0.145
 
 #define STATE_CALIBRATE 0
 #define STATE_SWING_UP  1
@@ -46,6 +46,7 @@
 #define STATE_FULL_STOP 3
 #define STATE_GO_RIGHT  4 
 #define STATE_GO_LEFT   5
+#define STATE_GO_CENTER 6
 
 #define A 35.98
 #define B 2.22
@@ -80,8 +81,7 @@ float control, u;
 
 unsigned long log_prescaler = 0;
 
-// int state = STATE_CALIBRATE;
-int state = STATE_GO_RIGHT;
+int state;
 
 void encoderHandler();
 void refEncoderHandler();
@@ -122,6 +122,7 @@ void setup() {
 
   Serial.begin(9600);
   lastTimeMicros = 0L;
+  state = STATE_CALIBRATE;
 }
 
 float saturate(float v, float maxValue) {
@@ -207,25 +208,36 @@ float getVelocityControl(float v, float target, float dt) {
   return Kp * error + integralError;
 }
 
+float getPositionControl(float x, float v, float target) {
+  float pKx = 100.0; //285.4;
+  float pKv = 15.0;//37.1;
+  return - (pKx * (x - target) + pKv * v);
+}
+
 void driveMotorWithControl(float control, float v) {
   u = (control + A * v + copysignf(C, v)) / B;
   u = 255.0 * u / 12.0;
   driveMotor(saturate(u, 254));
 }
 
-void loop() {
-
-  if (leftSwitchPressed) {
+void loop() {  
+  if (leftSwitchPressed && state == STATE_GO_LEFT) {
     leftSwitchPressed = false;
-    Serial.println("The cart has reached the left end");
-    long lengthPulses = rightSwitchPulses - encoderValue;
-    float railLength = getCartDistance(lengthPulses, PPR);
-    Serial.print(lengthPulses); Serial.print("\t");
-    Serial.println(railLength);
-    state = STATE_FULL_STOP;   
+    if (state == STATE_GO_LEFT) {
+      Serial.println("The cart has reached the left end");
+      long lengthPulses = rightSwitchPulses - encoderValue;
+      encoderValue = -lengthPulses / 2;
+      // float railLength = getCartDistance(lengthPulses, PPR);
+      // Serial.print(lengthPulses); Serial.print("\t");
+      // Serial.println(railLength);
+      state = STATE_GO_CENTER;
+    } else {
+      state = STATE_FULL_STOP;
+      Serial.println("[left] Unexpected state. Halt.");
+    }
   }
 
-  if (rightSwitchPressed) {
+  if (rightSwitchPressed && state == STATE_GO_RIGHT) {
     rightSwitchPressed = false;
     rightSwitchPulses = encoderValue;
     Serial.println("The cart has reached the right end");
@@ -234,7 +246,7 @@ void loop() {
       Serial.println("Going left...");
     } else {
       state = STATE_FULL_STOP;
-      Serial.println("Unexpected state. Halt.");
+      Serial.println("[right] Unexpected state. Halt.");
     }    
   }
 
@@ -246,11 +258,11 @@ void loop() {
   theta = getAngle(refEncoderValue, PENDULUM_ENCODER_PPR);
   w = (theta - last_theta) / dt;
 
-  if (fabs(x) >= POSITION_LIMIT) {
+  if (fabs(x) >= POSITION_LIMIT && (state == STATE_BALANCE || state == STATE_SWING_UP)) {
     if (state != STATE_FULL_STOP) {
       Serial.println("Cart reached end of rail");
     }
-    state = STATE_FULL_STOP;
+    state = STATE_GO_CENTER;
   }
 
   switch (state) {
@@ -266,7 +278,14 @@ void loop() {
       Serial.println("Waiting for the pendulum to come to rest...");
       calibrate();
       Serial.println("Pendulum is at rest");
-      state = STATE_SWING_UP;
+      state = STATE_GO_RIGHT;
+      break;
+    case STATE_GO_CENTER:
+      control = getPositionControl(x, v, 0.0);
+      driveMotorWithControl(control, v);
+      if (fabs(x) < 0.01) {
+        state = STATE_SWING_UP;
+      }
       break;
     case STATE_SWING_UP:      
       control = getSwingUpControl(x, v, theta, w);
