@@ -16,10 +16,14 @@ State:
 	[th, Y, x, Z]
 
 References:
- - Swinging up a pendulum by energy control􏰀 - K.J. Astrom, K. Furuta
+- Swinging up a pendulum by energy control - K.J. Astrom, K. Furuta
 """
 
 import numpy as np
+
+import matplotlib
+matplotlib.use('TKAgg')
+
 import matplotlib.pyplot as pp
 import scipy.integrate as integrate
 import matplotlib.animation as animation
