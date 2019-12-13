@@ -39,7 +39,7 @@ m = 0.5
 
 # simulation time
 dt = 0.05
-Tmax = 30
+Tmax = 60
 t = np.arange(0.0, Tmax, dt)
 
 # initial conditions
@@ -48,12 +48,13 @@ th = pi - 0.1		# pendulum angle
 x = .0		# cart position
 x0 = 0		# desired cart position
 Z = -0.05	# cart velocity
-k = 0.08	# control gain coefficient
+k = 0.055	# control gain coefficient
 
 state = np.array([th, Y, x, Z])
 
 def energy(th, dth):
 	return m * dth * L * dth * L / 2 + m * g * L * (cos(th) - 1)
+
 
 def derivatives(state, t):
 	ds = np.zeros_like(state)
@@ -64,7 +65,10 @@ def derivatives(state, t):
 	_Z = state[3]	# x'
 
 	E = energy(_th, _Y)
-	u = k * E * _Y * cos(_th)
+	if _th >= 0.5 * pi and _th <= 1.5 * pi:
+		u = k * E * _Y * cos(_th)
+	else:
+		u = 0
 
 	ds[0] = state[1]
 	ds[1] = (g * sin(_th) - u * cos(_th)) / L
@@ -87,7 +91,7 @@ pxs = L * sin(ths) + xs
 pys = L * cos(ths)
 
 fig = pp.figure()
-ax = fig.add_subplot(311, autoscale_on=False, xlim=(-1.5, 1.5), ylim=(-1.2, 1.2))
+ax = fig.add_subplot(111, autoscale_on=False, xlim=(-1.5, 1.5), ylim=(-1.2, 1.2))
 ax.set_aspect('equal')
 ax.grid()
 
@@ -130,17 +134,24 @@ def animate(i):
 ani = animation.FuncAnimation(fig, animate, np.arange(1, len(solution)),
                               interval=25, blit=True, init_func=init)
 
-pp.subplot(312)
+
+pp.figure()
+pp.subplot(211)
 
 Es = np.vectorize(energy)(ths, Ys)
 Us = k * Es * Ys * cos(ths)
 
-pp.plot(t, Us)
-pp.plot(t, vs)
+# pp.plot(t, Us, label='U')
+# pp.plot(t, vs, label='v')
+pp.plot(t, xs, label='x')
+# pp.plot(t, ths, label="th")
+# pp.plot(t, Ys, label="th'")
 pp.grid(True)
-pp.subplot(313)
-pp.plot(t, Es)
+pp.legend()
+pp.subplot(212)
+pp.plot(t, Es, label='E')
 pp.grid(True)
+pp.legend()
 pp.show()
 
 
