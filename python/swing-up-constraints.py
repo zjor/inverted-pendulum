@@ -47,7 +47,7 @@ Y = .0 		# pendulum angular velocity
 th = pi		# pendulum angle
 x = .0		# cart position
 x0 = 0		# desired cart position
-Z = -0.05	# cart velocity
+Z = 0.00	# cart velocity
 k = 0.055	# control gain coefficient
 E0 = -2.0 * m * g * L # starting energy
 
@@ -79,9 +79,22 @@ def get_position_control(x, v, x0):
 	Kv = 1.0
 	return -(Kx * (x - x0) + Kv * v)
 
+pid_i = 0.0
+Ki = 1.0
+Kp = 25.0
+def get_velocity_control(v, target, dt):
+	global pid_i
+
+	error = target - v
+	# pid_i += Ki * error * dt
+	return Kp * error + pid_i
+
+
 GO_CENTER = 0
 SWING_UP = 1
+SOFT_STOP = 2
 DONE = 3
+
 
 TOLERANCE = 1e-2
 
@@ -111,8 +124,36 @@ def get_state_control(x, v, th, w, e):
 		
 	return u
 
+fsm_state = SWING_UP
+def get_state_control2(x, v, th, w, e, dt):
+	global fsm_state
+	u = 0.0
+	going_to_center = sign(w * cos(th)) * x > 0
 
+	if fsm_state == SWING_UP:
+		if e >= 0:
+			fsm_state = DONE
+		elif (abs(x) <= 0.1 or going_to_center) and (th >= 2 * pi / 8 and th <= 10.0 * pi / 8):
+			u = -0.5 * sign(w * cos(th))
+		else:
+			fsm_state = SOFT_STOP			
+	elif fsm_state == SOFT_STOP:
+		if going_to_center:
+			fsm_state = SWING_UP
+		else:
+			u = get_velocity_control(v, 0.0, dt)
+	elif fsm_state == DONE:
+		u = get_velocity_control(v, 0.0, dt)
+
+	return u
+
+
+_last_integration_time = 0
 def derivatives(state, t):
+	global _last_integration_time
+	dt = t - _last_integration_time
+	_last_integration_time = t
+
 	ds = np.zeros_like(state)
 
 	_th = state[0]
@@ -123,7 +164,8 @@ def derivatives(state, t):
 	E = energy(_th, _Y)
 
 	# u = get_control(_x, _Z, _th, _Y, E)
-	u = get_state_control(_x, _Z, _th, _Y, E)
+	# u = get_state_control(_x, _Z, _th, _Y, E)
+	u = get_state_control2(_x, _Z, _th, _Y, E, dt)
 
 	ds[0] = state[1]
 	ds[1] = (g * sin(_th) - u * cos(_th)) / L
@@ -196,8 +238,8 @@ pp.subplot(211)
 Es = np.vectorize(energy)(ths, Ys)
 Us = k * Es * Ys * cos(ths)
 
-# pp.plot(t, Us, label='U')
-# pp.plot(t, vs, label='v')
+pp.plot(t, Us, label='U')
+pp.plot(t, vs, label='v')
 pp.plot(t, xs, label='x')
 # pp.plot(t, ths, label="th")
 # pp.plot(t, Ys, label="th'")

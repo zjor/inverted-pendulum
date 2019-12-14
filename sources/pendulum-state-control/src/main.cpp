@@ -81,6 +81,9 @@ float control, u;
 
 unsigned long log_prescaler = 0;
 
+volatile bool debounce = false;
+volatile long debounceTimestampMillis;
+
 int state;
 
 void encoderHandler();
@@ -153,8 +156,8 @@ void driveMotor(float u) {
   analogWrite(PWM_PIN, fabs(u));
 }
 
-boolean isControllable(float theta) {
-  return fabs(theta) < THETA_THRESHOLD;
+boolean isControllable(float theta, float w) {
+  return fabs(theta) < THETA_THRESHOLD && fabs(w) < 0.3;
 }
 
 void log_state(float control, float u) {
@@ -183,13 +186,8 @@ float getBalancingControl(float x, float v, float theta, float w) {
 }
 
 float getSwingUpControl(float x, float v, float theta, float w) {
-  float K = 12.0;
-  float c = -copysignf(K, - w * cos(theta));
-  float lim = 0.01;
-  if ((x >= lim && c > 0) || (x <= -lim && c < 0) || fabs(theta) < PI / 2) {
-    c = -(A * v + copysignf(C, v));
-  }
-  return c;
+  float K = 16.0;
+  return -copysignf(K, - w * cos(theta));
 }
 
 float integralError = 0.0;
@@ -209,8 +207,8 @@ float getVelocityControl(float v, float target, float dt) {
 }
 
 float getPositionControl(float x, float v, float target) {
-  float pKx = 100.0; //285.4;
-  float pKv = 15.0;//37.1;
+  float pKx = 60.0; //285.4;
+  float pKv = 5.0; //37.1;
   return - (pKx * (x - target) + pKv * v);
 }
 
@@ -220,8 +218,13 @@ void driveMotorWithControl(float control, float v) {
   driveMotor(saturate(u, 254));
 }
 
-void loop() {  
-  if (leftSwitchPressed && state == STATE_GO_LEFT) {
+void loop() {
+
+  if (millis() - debounceTimestampMillis > 50) {
+    debounce = false;
+  }
+
+  if (leftSwitchPressed) {
     leftSwitchPressed = false;
     if (state == STATE_GO_LEFT) {
       Serial.println("The cart has reached the left end");
@@ -237,7 +240,7 @@ void loop() {
     }
   }
 
-  if (rightSwitchPressed && state == STATE_GO_RIGHT) {
+  if (rightSwitchPressed) {
     rightSwitchPressed = false;
     rightSwitchPulses = encoderValue;
     Serial.println("The cart has reached the right end");
@@ -262,7 +265,7 @@ void loop() {
     if (state != STATE_FULL_STOP) {
       Serial.println("Cart reached end of rail");
     }
-    state = STATE_GO_CENTER;
+    state = STATE_FULL_STOP;
   }
 
   switch (state) {
@@ -281,17 +284,23 @@ void loop() {
       state = STATE_GO_RIGHT;
       break;
     case STATE_GO_CENTER:
-      control = getPositionControl(x, v, 0.0);
-      driveMotorWithControl(control, v);
-      if (fabs(x) < 0.01) {
+      if (isControllable(theta, w)) {
+        state = STATE_BALANCE;
+      } else if (fabs(x) < 0.01) {
         state = STATE_SWING_UP;
+      } else {
+        control = getPositionControl(x, v, 0.0);
+        driveMotorWithControl(control, v);
       }
       break;
-    case STATE_SWING_UP:      
-      control = getSwingUpControl(x, v, theta, w);
-      driveMotorWithControl(control, v);
-      if (isControllable(theta)) {
+    case STATE_SWING_UP:
+      if (isControllable(theta, w)) {
         state = STATE_BALANCE;
+      } else if (fabs(x) <= 0.05) {
+        control = getSwingUpControl(x, v, theta, w);
+        driveMotorWithControl(control, v);
+      } else {
+        state = STATE_GO_CENTER;
       }
       break;
     case STATE_BALANCE:
@@ -367,10 +376,14 @@ void calibrate() {
   sei();
 }
 
-void leftSwitchHandler() {
-  leftSwitchPressed = true;
+void leftSwitchHandler() {  
+  leftSwitchPressed = true && !debounce;
+  debounce = true;
+  debounceTimestampMillis = millis();
 }
 
 void rightSwitchHandler() {
-  rightSwitchPressed = true;
+  rightSwitchPressed = true && !debounce;
+  debounce = true;
+  debounceTimestampMillis = millis();
 }
