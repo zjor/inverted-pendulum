@@ -158,7 +158,7 @@ void driveMotor(float u) {
 }
 
 boolean isControllable(float theta, float w, float x) {
-  return fabs(theta) < THETA_THRESHOLD && fabs(w) < 0.5 && fabs(x) < 0.07;
+  return fabs(theta) < THETA_THRESHOLD && fabs(w) < 0.5 && fabs(x) < 0.05;
 }
 
 void log_state(float control, float u) {
@@ -201,7 +201,7 @@ float getVelocityControl(float v, float target, float dt) {
   }
 
   float error = target - v;
-  float Kp = 65.0;
+  float Kp = 50.0;
   float Ki = 10.0;
   integralError += Ki * error * dt;
   return Kp * error + integralError;
@@ -221,7 +221,7 @@ void driveMotorWithControl(float control, float v) {
 
 void loop() {
 
-  if (millis() - debounceTimestampMillis > 50) {
+  if (millis() - debounceTimestampMillis > 100) {
     debounce = false;
   }
 
@@ -300,7 +300,7 @@ void loop() {
     case STATE_SWING_UP:
       if (isControllable(theta, w, x)) {
         state = STATE_BALANCE;
-      } else if (fabs(x) <= 0.03 || swingsToCenter) {
+      } else if (fabs(x) <= 0.025 || swingsToCenter) {
         control = getSwingUpControl(x, v, theta, w);
         driveMotorWithControl(control, v);
       } else {
@@ -313,7 +313,7 @@ void loop() {
       } else if (swingsToCenter) {
         state = STATE_SWING_UP;
       } else {
-        control = getVelocityControl(v, -copysignf(0.001, x), dt);
+        control = getVelocityControl(v, -copysignf(0.02, x), dt);
         driveMotorWithControl(control, v);        
       }
       break;
