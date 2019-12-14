@@ -47,7 +47,6 @@
 #define STATE_GO_RIGHT  4 
 #define STATE_GO_LEFT   5
 #define STATE_GO_CENTER 6
-#define STATE_SOFT_STOP 7
 
 #define A 35.98
 #define B 2.22
@@ -187,8 +186,13 @@ float getBalancingControl(float x, float v, float theta, float w) {
 }
 
 float getSwingUpControl(float x, float v, float theta, float w) {
-  float K = 26.0;
-  return -copysignf(K, - w * cos(theta));
+  float K = 10.0;
+  float c = -copysignf(K, - w * cos(theta));
+  float lim = 0.01;
+  if ((x >= lim && c > 0) || (x <= -lim && c < 0) || fabs(theta) < PI / 2) {
+    c = -(A * v + copysignf(C, v)); // causes to stop immediately
+  }
+  return c;
 }
 
 float integralError = 0.0;
@@ -269,9 +273,6 @@ void loop() {
     state = STATE_FULL_STOP;
   }
 
-  float cosSign = fabs(theta) > PI / 2 ? -1 : 1;
-  boolean swingsToCenter = (x * w * cosSign < 0) && (fabs(theta) > 0.5 * PI && fabs(theta) < 1.5 * PI);
-
   switch (state) {
     case STATE_GO_RIGHT:
       control = getVelocityControl(v, 0.06, dt);
@@ -300,21 +301,9 @@ void loop() {
     case STATE_SWING_UP:
       if (isControllable(theta, w, x)) {
         state = STATE_BALANCE;
-      } else if (fabs(x) <= 0.025 || swingsToCenter) {
+      } else {
         control = getSwingUpControl(x, v, theta, w);
         driveMotorWithControl(control, v);
-      } else {
-        state = STATE_SOFT_STOP;
-      }
-      break;
-    case STATE_SOFT_STOP:
-      if (isControllable(theta, w, x)) {
-        state = STATE_BALANCE;
-      } else if (swingsToCenter) {
-        state = STATE_SWING_UP;
-      } else {
-        control = getVelocityControl(v, -copysignf(0.02, x), dt);
-        driveMotorWithControl(control, v);        
       }
       break;
     case STATE_BALANCE:
