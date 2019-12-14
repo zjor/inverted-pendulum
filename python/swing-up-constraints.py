@@ -49,6 +49,7 @@ x = .0		# cart position
 x0 = 0		# desired cart position
 Z = -0.05	# cart velocity
 k = 0.055	# control gain coefficient
+E0 = -2.0 * m * g * L # starting energy
 
 state = np.array([th, Y, x, Z])
 
@@ -73,29 +74,40 @@ def get_control(x, v, th, w, e):
 		u = -(Kx * x + Kv * v)
 	return u
 
+def get_position_control(x, v, x0):
+	Kx = 4.0
+	Kv = 1.0
+	return -(Kx * (x - x0) + Kv * v)
+
 GO_CENTER = 0
 SWING_UP = 1
+DONE = 3
+
+TOLERANCE = 1e-2
 
 fsm_state = GO_CENTER
 def get_state_control(x, v, th, w, e):
 	global fsm_state
-	Kx = 4.0
-	Kv = 1.0
-	u = 0.0	
-
-	if x >= 0.1 or x <= -0.1:
-		fsm_state = GO_CENTER
-	elif fsm_state == GO_CENTER and abs(x) > 1e-2:
-		fsm_state = GO_CENTER
-	elif e >= 0.0:
-		fsm_state = GO_CENTER
-	else:
-		fsm_state = SWING_UP
+	u = 0.0
 
 	if fsm_state == GO_CENTER:
-		u = -(Kx * x + Kv * v)
-	else:
-		u = - 0.9 * sign(w * cos(th))
+
+		if e >= 0.0:
+			fsm_state = DONE 
+		elif abs(x) <= TOLERANCE:
+			fsm_state = SWING_UP
+		else:
+			u = get_position_control(x, v, 0.0)
+
+	elif fsm_state == SWING_UP:
+		if e >= 0.0:
+			fsm_state = DONE
+		elif abs(x) <= 0.05:
+			u = -0.5 * sign(w * cos(th))
+		else:
+			fsm_state = GO_CENTER
+	elif fsm_state == DONE:
+		u = get_position_control(x, v, 0.0)
 		
 	return u
 
