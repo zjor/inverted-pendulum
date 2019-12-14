@@ -38,8 +38,8 @@ L = 1.0
 m = 0.5
 
 # simulation time
-dt = 0.05
-Tmax = 60
+dt = 0.051
+Tmax = 50
 t = np.arange(0.0, Tmax, dt)
 
 # initial conditions
@@ -73,24 +73,30 @@ def get_control(x, v, th, w, e):
 		u = -(Kx * x + Kv * v)
 	return u
 
-GO_LEFT = 0
-GO_RIGHT = 1
+GO_CENTER = 0
+SWING_UP = 1
 
-fsm_state = GO_LEFT
+fsm_state = GO_CENTER
 def get_state_control(x, v, th, w, e):
 	global fsm_state
-	Kx = 2.0
+	Kx = 4.0
 	Kv = 1.0
-	u = 0.0
-	if fsm_state == GO_LEFT and abs(x + 0.1) > 1e-2:
-		u = -(Kx * (x + 0.1) + Kv * v)
-	else:
-		fsm_state = GO_RIGHT
+	u = 0.0	
 
-	if fsm_state == GO_RIGHT and abs(x - 0.1) > 1e-2:
-		u = -(Kx * (x - 0.1) + Kv * v)
+	if x >= 0.1 or x <= -0.1:
+		fsm_state = GO_CENTER
+	elif fsm_state == GO_CENTER and abs(x) > 1e-2:
+		fsm_state = GO_CENTER
+	elif e >= 0.0:
+		fsm_state = GO_CENTER
 	else:
-		fsm_state = GO_LEFT
+		fsm_state = SWING_UP
+
+	if fsm_state == GO_CENTER:
+		u = -(Kx * x + Kv * v)
+	else:
+		u = - 0.9 * sign(w * cos(th))
+		
 	return u
 
 
