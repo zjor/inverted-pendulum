@@ -14,11 +14,30 @@ omegas = np.zeros(len(times))
 
 thetas[0] = pi/12   # initial Theta
 
+
+def derivatives(state):
+  th, w = state[0], state[1]
+  dth = w
+  dw = - g / L * sin(th)
+  return [dth, dw]
+
+
+def integrate(state, dt):
+  """
+  Integrate state with Heun's method
+  """
+  dstate = derivatives(state)
+  _state = list(map(lambda x: x[0] + x[1] * dt, zip(state, dstate)))
+  _dstate = derivatives(_state)
+  return list(map(lambda x: x[0] + (x[1] + x[2]) * dt / 2, zip(state, dstate, _dstate)))
+
+
 for i in range(1, len(times)):
-  dth = omegas[i - 1]
-  dw = -g / L * sin(thetas[i - 1])
-  omegas[i] = omegas[i - 1] + dw * dt
-  thetas[i] = thetas[i - 1] + dth * dt
+  state = [thetas[i - 1], omegas[i - 1]]
+  dstate = derivatives(state)
+  thetas[i], omegas[i] = integrate(state, dt)
+
+
 
 pp.plot(times, omegas)
 pp.plot(times, thetas)
