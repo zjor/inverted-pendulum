@@ -1,7 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as pp
+import matplotlib.animation as animation
 
-from math import pi, sin, sqrt
+from math import pi, sqrt
+from numpy import sin, cos
+
 
 g = 9.81
 L = 1.0
@@ -13,7 +16,7 @@ times = np.arange(0, T_max, dt)
 thetas = np.zeros(len(times))
 omegas = np.zeros(len(times))
 
-thetas[0] = 0.0   # initial Theta
+thetas[0] = 0   # initial Theta
 
 
 def momentum(t):
@@ -23,6 +26,9 @@ def momentum(t):
 
 
 def derivatives(state, t):
+  """
+  Th'' = - g / L * sin(Th) - M(t) / (m * L^2)
+  """
   th, w = state[0], state[1]
   dth = w
   dw = - g / L * sin(th) - momentum(t) / (m * L**2)
@@ -52,6 +58,35 @@ pp.grid(True)
 pp.subplot(212)
 pp.plot(times, list(map(lambda t: momentum(t), times)))
 pp.grid(True)
+
+# Animation
+
+xs = L * sin(thetas)
+ys = - L * cos(thetas)
+
+fig = pp.figure()
+ax = fig.add_subplot(111, autoscale_on=False, xlim=(-1.3, 1.3), ylim=(-1.2, 1.2))
+ax.set_aspect('equal')
+ax.grid()
+
+line, = ax.plot([], [], 'o-', lw=2)
+time_template = 'time = %.1fs'
+time_text = ax.text(0.05, 0.9, '', transform=ax.transAxes)
+
+
+def init():
+    line.set_data([], [])
+    time_text.set_text('')
+    return line, time_text
+
+
+def animate(i):
+    line.set_data([0, xs[i]], [0, ys[i]])
+    time_text.set_text(time_template % (i*dt))    
+    return line, time_text
+
+ani = animation.FuncAnimation(fig, animate, np.arange(1, len(times)),
+                              interval=25, blit=True, init_func=init)
 
 pp.show()
 
