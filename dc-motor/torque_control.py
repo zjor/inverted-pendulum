@@ -3,7 +3,7 @@ import numpy as np
 
 from pid import PID
 
-times = np.linspace(0, 0.1, 100)
+times = np.linspace(0, 10, 1000)
 dt = times[1] - times[0]
 
 # Motor params
@@ -15,19 +15,23 @@ B = 0.1
 J = 2.0
 
 state = [[0, 0]]
+u_log = []
 
-pid = PID(1.0, dt, k_p=0.8, k_i=0.2, k_d=0.004)
+pid = PID(target=1.0, dt=dt, k_p=0.02, k_i=0.0, k_d=0.0)
 
 
+# TODO: neglect L
 def derivatives(state_, t_, dt_):
-    u = 4.0
     i_, w_ = state_
+    u = pid.get_control(i_)
+    u_log.append(u)
     di = (-R * i_ - K2 * w_ + u) / L
     dw = (K1 * i_ - B * w_) / J
-    print(di, dw, i_)
+    print(di, dw, i_, u)
     return [di, dw]
 
 
+# TODO: test with simulation of 3-body problem
 def integrate(state_, t_, dt_, derivatives_func):
     k1 = derivatives_func(state_, t_, dt_)
     k2 = derivatives_func([v + d * dt_ for v, d in zip(state_, k1)], t_, dt_)
@@ -43,6 +47,7 @@ velocity = state[:, 1]
 
 pp.plot(times, current[:-1], label="i")
 pp.plot(times, velocity[:-1], label="w")
+pp.plot(times, u_log[::2], label="U")
 pp.grid(True)
 pp.legend()
 pp.show()
