@@ -14,3 +14,7 @@ class PID:
         self.err_acc += self.k_i * e * self.dt
         self.last_value = e
         return self.k_p * e + self.err_acc + self.k_d * de
+
+    def set_target(self, new_target):
+        self.target = new_target
+        self.err_acc = 0
