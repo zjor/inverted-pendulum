@@ -18,7 +18,7 @@ J = 2.0
 u_log = [0]
 i_log = []
 
-pid = PID(target=0.0, dt=dt, k_p=1.5, k_i=1.2, k_d=0.003, min_value=-12, max_value=12)
+pid = PID(target=0.0, dt=dt, k_p=1.5, k_i=1.2, k_d=0.000, min_value=-12, max_value=12)
 pid_w = PID(target=0.0, dt=dt, k_p=4.0, k_i=0.2, k_d=0.01)
 pid_x = PID(target=2.0, dt=dt, k_p=5.0, k_i=0.2, k_d=0.01)
 
