@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from math import sin, cos, pi
+import matplotlib
+matplotlib.use('TKAgg')  # integrate matplotlib with TKinter
 
 from lqr_solver import lqr, dlqr
 
