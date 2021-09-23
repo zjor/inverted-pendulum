@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from math import sin, cos, pi
+import matplotlib
+matplotlib.use('TKAgg')  # integrate matplotlib with TKinter
 
 from lqr_solver import lqr, dlqr
 
@@ -81,11 +83,11 @@ line_th, = plt.plot(range(0, N + 1), th, label = 'Th')
 line_dth, = plt.plot(range(0, N + 1), dth, label = 'dTh')
 line_f, = plt.plot(range(0, N + 1), f, label = 'acceleration')
 
-plt.legend([line_th, line_dth, line_f])
+plt.legend([line_th, line_dth, line_f], ['Th', 'dTh', 'acceleration'])
 
 plt.subplot(212)
 line_v, = plt.plot(range(0, N + 1), v, label = 'v')
 line_x, = plt.plot(range(0, N + 1), x, label = 'x')
 
-plt.legend([line_v, line_x])
+plt.legend([line_v, line_x],['v','x'])
 plt.show()
